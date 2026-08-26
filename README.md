@@ -1,14 +1,12 @@
 # boilerslate
 
-A lightweight, modular monorepo boilerplate for full-stack SaaS apps.
-Multi-tenant and themeable from the first commit.
-
-## Quick start
+A lightweight, modular monorepo starting point for full-stack SaaS apps.
+Multi-tenant, themeable, and typed end to end from the first commit.
 
 ```bash
 bun install
 bun run setup        # writes .env files, generates an auth secret
-bun run db:start     # Postgres 18 in Docker (host port 5433)
+bun run db:start     # Postgres 18 in Docker
 bun run db:migrate
 bun run dev
 ```
@@ -20,28 +18,35 @@ Web on <http://localhost:3001>, API on <http://localhost:3000>.
 - **[TanStack Start](https://tanstack.com/start)** — React with SSR and typed routing
 - **[Hono](https://hono.dev)** on **[Bun](https://bun.sh)** — the API server
 - **[oRPC](https://orpc.unnoq.com)** — typed RPC, with OpenAPI docs for free
-- **[Drizzle](https://orm.drizzle.team)** + **Postgres** — schema and migrations in TypeScript
+- **[Drizzle](https://orm.drizzle.team)** + **Postgres 18** — schema and migrations in TypeScript
 - **[Better Auth](https://better-auth.com)** — email/password auth plus organizations
-- **[shadcn/ui](https://ui.shadcn.com)** (`base-nova`, on [Base UI](https://base-ui.com)) + **Tailwind v4** — components, sidebar shell, eight themes
-- **[Turborepo](https://turbo.build)** + **[Biome](https://biomejs.dev)** — task running, linting, formatting
+- **[shadcn/ui](https://ui.shadcn.com)** (`base-nova`, on [Base UI](https://base-ui.com)) + **Tailwind v4**
+- **[Recharts](https://recharts.org)** — charts wired to the theme
+- **[Turborepo](https://turbo.build)** + **[Biome](https://biomejs.dev)** — tasks, linting, formatting
 
 Types flow from the database schema through to the React client with no code
 generation step and no DTO layer.
 
-## Layout
+## What you get
 
-```
-apps/
-  web/      TanStack Start app
-  server/   Hono API — mounts auth at /api/auth, oRPC at /rpc
-packages/
-  api/      oRPC routers and context
-  auth/     Better Auth configuration
-  db/       Drizzle schema and migrations
-  env/      Zod-validated environment variables
-  ui/       shadcn components, styles, brand theme
-  config/   shared tsconfig
-```
+**Auth and multi-tenancy.** Email/password sign-in, sessions in Postgres, and
+organizations with `owner` / `admin` / `member` roles and invitations. Tenant
+isolation is covered by tests: a non-member gets a 403 even when naming an
+organization id directly.
+
+**A design system with eight themes.** Emerald, violet, blue, cyan, rose,
+orange, amber and neutral, each in light and dark — theme and mode are
+independent axes, switchable at runtime and applied before first paint so there
+is no flash on load. Corner radius is adjustable too.
+
+**36 UI components plus ten AI primitives** — streaming text with citations,
+reasoning traces, tool-call chips, live task status, human-in-the-loop
+approval, retrieved-context cards, a code/diff viewer, a prompt composer with
+`@` sources and `/` commands, and a chat transcript.
+
+**Three pages to build from.** `/dashboard` (charts and stats), `/settings`
+(theme editing) and `/playground` — every component live on one screen, so a
+design change can be checked against the whole library at once.
 
 ## Verification
 
@@ -52,66 +57,31 @@ that run the real API against a real Postgres:
 bun run verify
 ```
 
-CI runs exactly this on every push and pull request.
+CI runs exactly this on every push and pull request. The tests do not mock the
+database or stub auth; if they pass, the features genuinely work.
 
-## Multi-tenancy
+## Layout
 
-Users belong to organizations with `owner` / `admin` / `member` roles, via
-Better Auth's organization plugin. Invitations, membership and role checks are
-built in, and the test suite covers tenant isolation — a non-member gets a 403
-even when naming an organization id directly.
-
-```ts
-await authClient.organization.create({ name: "Acme Inc", slug: "acme" });
-await authClient.organization.inviteMember({ email, role: "member" });
 ```
-
-When you write your own oRPC procedures, scope them to the caller's
-organization yourself — see `AGENTS.md`.
-
-## Dashboard & charts
-
-`/dashboard` is the reference for data-dense pages: KPI cards with sparklines,
-a bar chart with a divided stat footer, a donut with a centred total, an area
-chart and usage meters. Charts are [Recharts](https://recharts.org) via the
-shadcn `ChartContainer`, coloured from the theme's chart ramp — switch theme
-and every chart follows.
-
-## AI components
-
-Ten primitives for agent interfaces live in
-`packages/ui/src/components/ai/` — streaming text with citations, reasoning
-traces, tool-call chips, live task status, human-in-the-loop approval,
-retrieved-context cards, a code/diff viewer, a prompt composer with `@`
-sources and `/` commands, and a chat transcript.
-
-They are presentational: data in, callbacks out, no model client. See them all
-running on `/playground`.
-
-## Design system
-
-Eight themes — emerald, violet, blue, cyan, rose, orange, amber, neutral —
-each with a full light and dark palette. Theme and mode are independent axes
-on `<html>`:
-
-```html
-<html class="dark" data-theme="violet">
+apps/
+  web/      TanStack Start app
+  server/   Hono API — auth at /api/auth, oRPC at /rpc
+packages/
+  api/      oRPC routers and context
+  auth/     Better Auth configuration
+  db/       Drizzle schema and migrations
+  env/      Zod-validated environment variables
+  ui/       components, styles, themes, AI primitives
+  config/   shared tsconfig
 ```
-
-Users switch themes from the header dropdown or the settings page; the choice
-persists and is applied before first paint, so there is no flash on load.
-Corner radius is adjustable too.
-
-Add a theme by adding a token block in `packages/ui/src/styles/themes.css` and
-an entry in `packages/ui/src/lib/themes.ts`. Nothing else needs to change.
 
 ## Adding to the base
 
-The core stays small on purpose. Add what a given project needs:
+The core stays small on purpose:
 
 ```bash
 bun run gen:package <name>              # new workspace package
-bunx create-better-t-stack@latest add   # PWA, docs site, desktop shell, ...
+bunx create-better-t-stack@latest add   # PWA, docs site, desktop shell, …
 ```
 
 ## Deployment
@@ -122,11 +92,28 @@ Dockerfiles and a compose file for the whole stack are included:
 bun run docker:up
 ```
 
-This runs anywhere Docker does — a VPS, Railway, Fly, or your own hardware.
+See [docs/deployment.md](docs/deployment.md) before pointing it at the
+internet.
 
-## Working with AI agents
+## Documentation
 
-`AGENTS.md` (symlinked as `CLAUDE.md`) is the instruction layer for coding
-agents — Claude Code, Cursor, Codex, Copilot and others all read it. It records
-the conventions, the commands, and the gotchas already hit. Keep it current;
-it is the highest-leverage file in the repo.
+- [Getting started](docs/getting-started.md) — setup, commands, making it yours
+- [Architecture](docs/architecture.md) — layout, type safety, testing
+- [Design system](docs/design-system.md) — themes, tokens, charts
+- [Multi-tenancy](docs/multi-tenancy.md) — organizations and scoping
+- [AI components](docs/ai-components.md) — the ten agent primitives
+- [Deployment](docs/deployment.md) — Docker, production, CI
+
+`AGENTS.md` (symlinked as `CLAUDE.md`) is the instruction layer for AI coding
+agents — Claude Code, Cursor, Codex, Copilot and others all read it. It is the
+highest-leverage file in the repo; keep it current.
+
+## Known gaps
+
+- No organization UI — the API works and is tested, the screens are not written
+- No payments; Better Auth integrates with Polar in one flag when you want it
+- No email sending, so invitations cannot be delivered yet
+
+## License
+
+MIT

@@ -22,7 +22,7 @@ Web on <http://localhost:3001>, API on <http://localhost:3000>.
 - **[oRPC](https://orpc.unnoq.com)** — typed RPC, with OpenAPI docs for free
 - **[Drizzle](https://orm.drizzle.team)** + **Postgres** — schema and migrations in TypeScript
 - **[Better Auth](https://better-auth.com)** — email/password auth plus organizations
-- **[shadcn/ui](https://ui.shadcn.com)** + **Tailwind v4** — components, sidebar shell, eight themes
+- **[shadcn/ui](https://ui.shadcn.com)** (`base-nova`, on [Base UI](https://base-ui.com)) + **Tailwind v4** — components, sidebar shell, eight themes
 - **[Turborepo](https://turbo.build)** + **[Biome](https://biomejs.dev)** — task running, linting, formatting
 
 Types flow from the database schema through to the React client with no code

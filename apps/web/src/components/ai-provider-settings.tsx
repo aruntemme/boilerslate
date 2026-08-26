@@ -176,8 +176,25 @@ function ProviderRow({
 
 export function AiProviderSettings() {
 	const queryClient = useQueryClient();
-	const providers = useQuery(orpc.ai.listProviders.queryOptions());
-	const settings = useQuery(orpc.ai.getSettings.queryOptions());
+
+	// These procedures 403 until the session has an active organization, which
+	// is a permanent condition, not a blip. Retrying it just spins forever.
+	const noRetryOn4xx = {
+		retry: (failureCount: number, error: unknown) => {
+			const status = (error as { status?: number })?.status;
+			if (status && status >= 400 && status < 500) return false;
+			return failureCount < 2;
+		},
+	};
+
+	const providers = useQuery({
+		...orpc.ai.listProviders.queryOptions(),
+		...noRetryOn4xx,
+	});
+	const settings = useQuery({
+		...orpc.ai.getSettings.queryOptions(),
+		...noRetryOn4xx,
+	});
 
 	const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
 
@@ -191,23 +208,32 @@ export function AiProviderSettings() {
 		}),
 	);
 
-	// Organization-scoped procedures 403 when no organization is active.
-	if (providers.isError || settings.isError) {
+	const error = providers.error ?? settings.error;
+	if (error) {
+		// 403 here means "no active organization", which is expected until an
+		// organization exists — say so, rather than reporting a failure.
+		const needsOrganization = (error as { status?: number }).status === 403;
 		return (
 			<Card>
 				<CardHeader>
 					<CardTitle>AI</CardTitle>
 					<CardDescription>
-						{providers.error?.message ??
-							settings.error?.message ??
-							"Could not load AI settings."}
+						{needsOrganization
+							? "AI providers are configured per organization. Create or select an organization to set them up."
+							: (error.message ?? "Could not load AI settings.")}
 					</CardDescription>
 				</CardHeader>
+				{needsOrganization && (
+					<CardContent className="text-muted-foreground text-sm">
+						There is no organization UI yet — create one through the API, or see{" "}
+						<code className="text-foreground">docs/multi-tenancy.md</code>.
+					</CardContent>
+				)}
 			</Card>
 		);
 	}
 
-	if (providers.isPending || settings.isPending) {
+	if (!providers.data || !settings.data) {
 		return (
 			<Card>
 				<CardHeader>
@@ -248,7 +274,17 @@ export function AiProviderSettings() {
 						}}
 					>
 						<SelectTrigger className="w-full sm:w-96">
-							<SelectValue />
+							{/* Base UI renders the raw value by default, which here is the
+							    composite "provider:model" id — show the labels instead. */}
+							<SelectValue>
+								{active
+									? `${active.label} · ${
+											active.models.find(
+												(m) => m.id === settings.data.activeModel,
+											)?.label ?? settings.data.activeModel
+										}`
+									: settings.data.activeModel}
+							</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
 							{providers.data.map((p) => (

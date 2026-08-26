@@ -49,6 +49,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Copy, LogOut, Mail, Trash2, UserPlus, Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { TeamsCard } from "@/components/teams-card";
 import { authClient } from "@/lib/auth-client";
 
 export const Route = createFileRoute("/_auth/organization")({
@@ -440,6 +441,13 @@ function RouteComponent() {
 					</CardFooter>
 				)}
 			</Card>
+
+			<TeamsCard
+				organizationId={organization.id}
+				organizationMembers={members}
+				canManage={manage}
+				onChanged={refresh}
+			/>
 
 			<Card>
 				<CardHeader>

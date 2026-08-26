@@ -19,6 +19,13 @@ export const Route = createFileRoute("/_auth")({
 				to: "/login",
 			});
 		}
+		// Everything in here is organization-scoped, so make the choice up front
+		// rather than letting each page fail its own way.
+		if (!session.data.session.activeOrganizationId) {
+			throw redirect({
+				to: "/select-organization",
+			});
+		}
 		return { session };
 	},
 });

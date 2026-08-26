@@ -581,3 +581,195 @@ describe("organization permissions", () => {
 		);
 	});
 });
+
+describe("teams", () => {
+	async function ownerWithOrg(prefix: string) {
+		const { cookie, email } = await signUp(prefix);
+		const slug = `org-${crypto.randomUUID().slice(0, 8)}`;
+		const created = await call("/api/auth/organization/create", {
+			method: "POST",
+			body: JSON.stringify({ name: `${prefix} Org`, slug }),
+			cookie,
+		});
+		expect(created.status).toBe(200);
+		await call("/api/auth/organization/set-active", {
+			method: "POST",
+			body: JSON.stringify({ organizationId: created.body.id }),
+			cookie,
+		});
+		return { cookie, email, organizationId: created.body.id as string };
+	}
+
+	async function createTeam(
+		cookie: string,
+		organizationId: string,
+		name: string,
+	) {
+		const res = await call("/api/auth/organization/create-team", {
+			method: "POST",
+			body: JSON.stringify({ name, organizationId }),
+			cookie,
+		});
+		expect(res.status).toBe(200);
+		return res.body.id as string;
+	}
+
+	test("no default team is created with the organization", async () => {
+		// defaultTeam is disabled: a new organization starts with zero teams.
+		const owner = await ownerWithOrg("team-default");
+		const list = await call(
+			`/api/auth/organization/list-teams?organizationId=${owner.organizationId}`,
+			{ cookie: owner.cookie },
+		);
+		expect(list.status).toBe(200);
+		expect(list.body).toEqual([]);
+	});
+
+	test("an owner can create and list teams", async () => {
+		const owner = await ownerWithOrg("team-create");
+		await createTeam(owner.cookie, owner.organizationId, "Engineering");
+		await createTeam(owner.cookie, owner.organizationId, "Design");
+
+		const list = await call(
+			`/api/auth/organization/list-teams?organizationId=${owner.organizationId}`,
+			{ cookie: owner.cookie },
+		);
+		expect(list.body.map((t: Json) => t.name).sort()).toEqual([
+			"Design",
+			"Engineering",
+		]);
+	});
+
+	test("teams are scoped to their organization", async () => {
+		const a = await ownerWithOrg("team-tenant-a");
+		await createTeam(a.cookie, a.organizationId, "Secret Team");
+
+		const b = await ownerWithOrg("team-tenant-b");
+		const list = await call(
+			`/api/auth/organization/list-teams?organizationId=${b.organizationId}`,
+			{ cookie: b.cookie },
+		);
+		expect(list.body).toEqual([]);
+	});
+
+	test("a non-member cannot list another organization's teams", async () => {
+		const owner = await ownerWithOrg("team-outsider");
+		await createTeam(owner.cookie, owner.organizationId, "Private");
+
+		const outsider = await signUp("team-outsider-user");
+		const res = await call(
+			`/api/auth/organization/list-teams?organizationId=${owner.organizationId}`,
+			{ cookie: outsider.cookie },
+		);
+		if (res.status === 200) {
+			expect(res.body).toEqual([]);
+		} else {
+			expect(res.status).toBeGreaterThanOrEqual(400);
+		}
+	});
+
+	test("members can be added to and removed from a team", async () => {
+		const owner = await ownerWithOrg("team-membership");
+		const teamId = await createTeam(owner.cookie, owner.organizationId, "Core");
+
+		const full = await call("/api/auth/organization/get-full-organization", {
+			cookie: owner.cookie,
+		});
+		const ownerUserId = full.body.members[0].userId;
+
+		// The owner joins too, otherwise they cannot read the roster afterwards
+		// — list-team-members requires the caller to be on the team.
+		const addedOwner = await call("/api/auth/organization/add-team-member", {
+			method: "POST",
+			body: JSON.stringify({ teamId, userId: ownerUserId }),
+			cookie: owner.cookie,
+		});
+		expect(addedOwner.status).toBe(200);
+
+		const invitee = await signUp("team-mate");
+		const invited = await call("/api/auth/organization/invite-member", {
+			method: "POST",
+			body: JSON.stringify({ email: invitee.email, role: "member" }),
+			cookie: owner.cookie,
+		});
+		expect(invited.status).toBe(200);
+		await call("/api/auth/organization/accept-invitation", {
+			method: "POST",
+			body: JSON.stringify({ invitationId: invited.body.id }),
+			cookie: invitee.cookie,
+		});
+
+		const mateFull = await call(
+			"/api/auth/organization/get-full-organization",
+			{
+				cookie: owner.cookie,
+			},
+		);
+		const mateUserId = mateFull.body.members.find(
+			(m: Json) => m.user?.email === invitee.email,
+		).userId;
+
+		const added = await call("/api/auth/organization/add-team-member", {
+			method: "POST",
+			body: JSON.stringify({ teamId, userId: mateUserId }),
+			cookie: owner.cookie,
+		});
+		expect(added.status).toBe(200);
+
+		const listed = await call(
+			`/api/auth/organization/list-team-members?teamId=${teamId}`,
+			{ cookie: owner.cookie },
+		);
+		expect(listed.status).toBe(200);
+		expect(listed.body.map((m: Json) => m.userId)).toContain(mateUserId);
+
+		const removed = await call("/api/auth/organization/remove-team-member", {
+			method: "POST",
+			body: JSON.stringify({ teamId, userId: mateUserId }),
+			cookie: owner.cookie,
+		});
+		expect(removed.status).toBe(200);
+
+		const after = await call(
+			`/api/auth/organization/list-team-members?teamId=${teamId}`,
+			{ cookie: owner.cookie },
+		);
+		expect(after.status).toBe(200);
+		expect(after.body.map((m: Json) => m.userId)).not.toContain(mateUserId);
+		expect(after.body.map((m: Json) => m.userId)).toContain(ownerUserId);
+	});
+
+	test("listing a team's members requires being on that team", async () => {
+		// Documents a real constraint: an owner who is not on a team cannot read
+		// its roster. The UI has to handle that rather than spin.
+		const owner = await ownerWithOrg("team-not-member");
+		const teamId = await createTeam(
+			owner.cookie,
+			owner.organizationId,
+			"Closed",
+		);
+
+		const res = await call(
+			`/api/auth/organization/list-team-members?teamId=${teamId}`,
+			{ cookie: owner.cookie },
+		);
+		expect(res.status).toBeGreaterThanOrEqual(400);
+	});
+
+	test("deleting a team keeps its members in the organization", async () => {
+		const owner = await ownerWithOrg("team-delete");
+		const teamId = await createTeam(owner.cookie, owner.organizationId, "Temp");
+
+		const removed = await call("/api/auth/organization/remove-team", {
+			method: "POST",
+			body: JSON.stringify({ teamId }),
+			cookie: owner.cookie,
+		});
+		expect(removed.status).toBe(200);
+
+		const full = await call("/api/auth/organization/get-full-organization", {
+			cookie: owner.cookie,
+		});
+		expect(full.body.members.length).toBe(1);
+	});
+});

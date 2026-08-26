@@ -31,8 +31,8 @@ generation step and no DTO layer.
 ## What you get
 
 **Auth and multi-tenancy.** Email/password sign-in, sessions in Postgres, and
-organizations with `owner` / `admin` / `member` roles and invitations, with a
-switcher and a management page. Tenant isolation and role enforcement are
+organizations with `owner` / `admin` / `member` roles, teams, and invitations,
+with a post-login chooser, a switcher and a management page. Tenant isolation and role enforcement are
 covered by tests: a non-member gets a 403 even when naming an
 organization id directly.
 
@@ -120,7 +120,7 @@ highest-leverage file in the repo; keep it current.
 
 - No email sending, so invitations are shared as links rather than delivered
 - No payments; Better Auth integrates with Polar in one flag when you want it
-- No teams UI (the organization plugin supports them; the screens are not written)
+- No custom roles beyond owner / admin / member
 
 ## License
 

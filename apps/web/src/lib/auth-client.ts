@@ -43,5 +43,7 @@ export const authClient = createAuthClient({
 	baseURL: new URL("/api/auth", getServerUrl(env.VITE_SERVER_URL)).toString(),
 	// Mirrors the server-side organization() plugin so authClient.organization.*
 	// is available and fully typed on the client.
-	plugins: [organizationClient()],
+	// The teams flag must match the server plugin, or authClient.organization
+	// simply will not expose the team methods.
+	plugins: [organizationClient({ teams: { enabled: true } })],
 });

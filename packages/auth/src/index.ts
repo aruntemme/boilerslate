@@ -36,6 +36,19 @@ export function createAuth() {
 				membershipLimit: 100,
 				creatorRole: "owner",
 				invitationExpiresIn: 60 * 60 * 48, // 48 hours
+				// Teams are sub-groups within an organization. Enabling adds the
+				// `team` and `team_member` tables — see docs/multi-tenancy.md.
+				teams: {
+					enabled: true,
+					// Do not auto-create a "General" team; an organization with no
+					// teams is a valid state and the UI handles it.
+					defaultTeam: { enabled: false },
+					maximumTeams: 20,
+					// Consistent with defaultTeam being off: zero teams is a valid
+					// state, so the last team must be deletable. Otherwise the first
+					// team anyone creates can never be removed.
+					allowRemovingAllTeams: true,
+				},
 			}),
 		],
 	});

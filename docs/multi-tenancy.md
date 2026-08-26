@@ -63,9 +63,15 @@ directly.
 
 | Where | What |
 | --- | --- |
+| `/select-organization` | Post-login chooser, shown when the session has no active organization |
 | Sidebar header | Organization switcher — list, switch, create |
-| `/organization` | Profile (owner only), members with role management, invitations |
+| `/organization` | Profile (owner only), members with role management, teams, invitations |
 | `/accept-invitation/$invitationId` | Public accept/decline page |
+
+The chooser lives **outside** the `_auth` layout on purpose: that layout
+redirects there when no organization is active, so nesting it would make the
+two bounce off each other forever. With exactly one organization it selects it
+and moves on rather than asking a pointless question.
 
 Switching sets the active organization **on the session**, server-side, so it
 changes what every organization-scoped procedure can see. The switcher
@@ -89,9 +95,35 @@ with the address the invitation was sent to; the server refuses otherwise
 Wire up an email provider and Better Auth will send these itself — see
 `sendInvitationEmail` in the organization plugin options.
 
+## Teams
+
+Sub-groups within an organization, enabled in `packages/auth/src/index.ts`.
+Teams group people — they do **not** carry their own permissions in this
+configuration. Organization roles still decide what someone may do; a team is a
+label for "who works on what", not an access boundary.
+
+Two settings there are deliberate and paired:
+
+- `defaultTeam: { enabled: false }` — a new organization starts with no teams,
+  because most projects do not need them.
+- `allowRemovingAllTeams: true` — follows from the above. Better Auth otherwise
+  refuses to delete the *last* team, which would make the first team anyone
+  creates permanently undeletable.
+
+Enabling teams also adds `invitation.teamId`, so an invitation can drop someone
+straight onto a team.
+
+### A constraint worth knowing
+
+`list-team-members` requires the **caller** to be on that team. An owner who is
+not a member cannot read its roster — the API returns an error, not an empty
+list. `TeamsCard` handles that explicitly; without it the panel would sit on
+"Loading members…" forever.
+
+That endpoint also returns rows with no joined user, so the UI resolves names
+from the organization roster it already has.
+
 ## Still missing
 
 - Email delivery for invitations
 - Custom roles beyond `owner` / `admin` / `member`
-- Teams (sub-groups within an organization); the plugin supports them, the UI
-  does not

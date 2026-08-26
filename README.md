@@ -69,6 +69,17 @@ await authClient.organization.inviteMember({ email, role: "member" });
 When you write your own oRPC procedures, scope them to the caller's
 organization yourself — see `AGENTS.md`.
 
+## AI components
+
+Ten primitives for agent interfaces live in
+`packages/ui/src/components/ai/` — streaming text with citations, reasoning
+traces, tool-call chips, live task status, human-in-the-loop approval,
+retrieved-context cards, a code/diff viewer, a prompt composer with `@`
+sources and `/` commands, and a chat transcript.
+
+They are presentational: data in, callbacks out, no model client. See them all
+running on `/playground`.
+
 ## Design system
 
 Eight themes — emerald, violet, blue, cyan, rose, orange, amber, neutral —

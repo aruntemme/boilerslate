@@ -7,12 +7,26 @@
  *
  * When you add a component to packages/ui, add it here too.
  */
+
 import {
 	Accordion,
 	AccordionContent,
 	AccordionItem,
 	AccordionTrigger,
 } from "@boilerslate/ui/components/accordion";
+import { ApprovalCard } from "@boilerslate/ui/components/ai/approval-card";
+import { Chat } from "@boilerslate/ui/components/ai/chat";
+import { CodeBlock } from "@boilerslate/ui/components/ai/code-block";
+import { ContextCards } from "@boilerslate/ui/components/ai/context-cards";
+import { LoadingState } from "@boilerslate/ui/components/ai/loading-state";
+import { PromptBar } from "@boilerslate/ui/components/ai/prompt-bar";
+import {
+	StreamingText,
+	useStreamedText,
+} from "@boilerslate/ui/components/ai/streaming-text";
+import { TaskRows } from "@boilerslate/ui/components/ai/task-rows";
+import { Thinking } from "@boilerslate/ui/components/ai/thinking";
+import { ToolChips } from "@boilerslate/ui/components/ai/tool-chips";
 import {
 	Alert,
 	AlertAction,
@@ -190,6 +204,265 @@ const ROWS = [
 	{ id: "2", name: "Alan Turing", role: "Admin", status: "Active" },
 	{ id: "3", name: "Grace Hopper", role: "Member", status: "Invited" },
 ];
+
+const ANSWER =
+	"Pistachio is your fastest-growing flavour — sales are up 23% this month, driven almost entirely by weekend traffic.";
+
+const SOURCES = [
+	{ id: "s1", title: "Scoop Data", host: "scoopdata.io" },
+	{ id: "s2", title: "Trends Index", host: "trends.google.com" },
+];
+
+const THINKING_STEPS = [
+	{ id: "t1", label: "Reading flavour briefs" },
+	{ id: "t2", label: "Scanning supplier lists" },
+	{ id: "t3", label: "Comparing tasting notes", detail: "6 flavours" },
+	{ id: "t4", label: "Writing the report", status: "active" as const },
+];
+
+const TOOL_CALLS = [
+	{
+		id: "c1",
+		kind: "edit" as const,
+		label: "Write 204 lines",
+		target: "ChurnSchedule.tsx",
+		status: "done" as const,
+		body: 'const windows = slots.filter((s) => s.temp <= -12)\nreturn schedule(windows, { hero: "pistachio" })',
+	},
+	{
+		id: "c2",
+		kind: "run" as const,
+		label: "Rebuild and verify",
+		target: "npm run freeze",
+		status: "done" as const,
+		body: "✓ built in 1.2s\n✓ 34 checks passed",
+	},
+	{
+		id: "c3",
+		kind: "read" as const,
+		label: "Read image",
+		target: "flavor-chart.png",
+		status: "running" as const,
+	},
+];
+
+const TASKS = [
+	{
+		id: "k1",
+		title: "Verified vendor records",
+		status: "completed" as const,
+		meta: "12 suppliers",
+		steps: [
+			{ id: "k1a", label: "Matched tax and contact IDs", meta: "12/12" },
+			{ id: "k1b", label: "Flagged stale records", meta: "0" },
+		],
+	},
+	{
+		id: "k2",
+		title: "Build reorder task list",
+		status: "running" as const,
+		meta: "7 SKUs",
+		steps: [
+			{ id: "k2a", label: "Reading POS export", meta: "3 files" },
+			{ id: "k2b", label: "Scoring stockout risk", meta: "68%" },
+		],
+	},
+	{ id: "k3", title: "Draft supplier emails", status: "failed" as const },
+	{ id: "k4", title: "Publish summer menu", status: "queued" as const },
+];
+
+const APPROVAL_QUESTIONS = [
+	{
+		id: "q1",
+		question: "How many flavours should we launch?",
+		options: [
+			{ id: "a", label: "Three", description: "Core line" },
+			{ id: "b", label: "Five", description: "Full case" },
+			{ id: "c", label: "Just one hero" },
+		],
+	},
+	{
+		id: "q2",
+		question: "Which market do we enter first?",
+		options: [
+			{ id: "a", label: "Food trucks" },
+			{ id: "b", label: "Grocery freezers" },
+			{ id: "c", label: "Scoop shops" },
+		],
+	},
+];
+
+const CHUNKS = [
+	{
+		id: "ch1",
+		title: "Vendor onboarding rule",
+		content:
+			"Cold-chain certification must be verified before a new dairy can be added to the reorder workflow.",
+		source: { name: "Dairy Onboarding SOP.pdf", kind: "pdf" },
+		score: 0.92,
+	},
+	{
+		id: "ch2",
+		title: "Seasonal demand row",
+		content:
+			"Q4 velocity: pistachio +18%, vanilla +6%, rocky road −11%; retire flavours below 40 scoops weekly.",
+		source: { name: "Sales Velocity Export.csv", kind: "csv" },
+		score: 0.78,
+	},
+];
+
+const DIFF = [
+	{ type: "context" as const, content: "export async function churnBatch() {" },
+	{
+		type: "remove" as const,
+		content: '  const flavor = await getFlavor("vanilla");',
+	},
+	{
+		type: "add" as const,
+		content: '  const flavor = await getFlavor("pistachio");',
+	},
+	{ type: "context" as const, content: "  return base.gallons;" },
+	{ type: "context" as const, content: "}" },
+];
+
+/** Every AI primitive, wired to real state. */
+function AiSection() {
+	const stream = useStreamedText(ANSWER);
+	const [messages, setMessages] = useState([
+		{
+			id: "m1",
+			role: "user" as const,
+			content: "Compare mint chip to last summer",
+		},
+		{
+			id: "m2",
+			role: "assistant" as const,
+			content:
+				"Mint chip is up 12%, with stronger weekend peaks than last year.",
+		},
+	]);
+	const [sent, setSent] = useState<string | null>(null);
+	const [approved, setApproved] = useState<string | null>(null);
+
+	return (
+		<>
+			<Section title="AI · Loading & Thinking">
+				<LoadingState label="Churning" variant="grid" />
+				<LoadingState label="Reading" variant="dots" />
+				<LoadingState label="Indexing" variant="orbit" />
+				<Thinking
+					className="w-full"
+					steps={THINKING_STEPS}
+					durationSeconds={4}
+					defaultOpen
+				/>
+			</Section>
+
+			<Section
+				title="AI · Streaming answer"
+				description="Re-renders as tokens arrive, with sources and follow-ups."
+			>
+				<StreamingText
+					className="w-full"
+					text={stream.text}
+					streaming={!stream.done}
+					sources={SOURCES}
+					followUps={[
+						"Which flavours sell best in winter",
+						"Compare gelato and soft serve margins",
+					]}
+					onFollowUp={(p) => toast(`Follow-up: ${p}`)}
+				/>
+			</Section>
+
+			<Section
+				title="AI · Tool calls"
+				description="Click a chip to expand its payload."
+			>
+				<ToolChips className="w-full" calls={TOOL_CALLS} />
+			</Section>
+
+			<Section title="AI · Task status">
+				<TaskRows className="w-full" tasks={TASKS} />
+			</Section>
+
+			<Section
+				title="AI · Approval"
+				description="Human-in-the-loop before the agent acts."
+			>
+				<ApprovalCard
+					className="w-full"
+					questions={APPROVAL_QUESTIONS}
+					onComplete={(answers) => {
+						setApproved(JSON.stringify(answers));
+						toast.success("Approved");
+					}}
+				/>
+				{approved && (
+					<p className="w-full text-muted-foreground text-xs">
+						Answers: <code>{approved}</code>
+					</p>
+				)}
+			</Section>
+
+			<Section title="AI · Retrieved context">
+				<ContextCards className="w-full" chunks={CHUNKS} totalChunks={32} />
+			</Section>
+
+			<Section title="AI · Code">
+				<CodeBlock
+					className="w-full"
+					filename="churn.ts"
+					code={
+						'export async function churnBatch() {\n  const flavor = await getFlavor("pistachio");\n  await freezer.store(flavor, { temp: "-16C" });\n  return flavor.gallons;\n}'
+					}
+				/>
+				<CodeBlock
+					className="w-full"
+					filename="churn.ts — proposed"
+					diff={DIFF}
+				/>
+			</Section>
+
+			<Section
+				title="AI · Chat & Prompt bar"
+				description="Type @ for sources or / for commands. Enter sends."
+			>
+				<Chat
+					className="max-h-64 w-full"
+					messages={messages}
+					userInitials="AT"
+				/>
+				<PromptBar
+					className="w-full"
+					sources={[
+						{ id: "s1", label: "sales.csv", hint: "file" },
+						{ id: "s2", label: "suppliers", hint: "table" },
+					]}
+					commands={[
+						{ id: "c1", label: "summarise" },
+						{ id: "c2", label: "compare" },
+					]}
+					models={["opus-5", "sonnet-5", "haiku-4.5"]}
+					model="opus-5"
+					onSubmit={(v) => {
+						setSent(v);
+						setMessages((m) => [
+							...m,
+							{ id: `m${m.length + 1}`, role: "user" as const, content: v },
+						]);
+						toast.success("Sent to the agent");
+					}}
+				/>
+				{sent && (
+					<p className="w-full text-muted-foreground text-xs">
+						Last submitted: <code>{sent}</code>
+					</p>
+				)}
+			</Section>
+		</>
+	);
+}
 
 function RouteComponent() {
 	const [checked, setChecked] = useState(true);
@@ -676,6 +949,8 @@ function RouteComponent() {
 					</PaginationContent>
 				</Pagination>
 			</Section>
+
+			<AiSection />
 
 			<Card>
 				<CardHeader>

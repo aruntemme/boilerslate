@@ -156,6 +156,17 @@ Import it as `@boilerslate/<name>`.
 sidebar shell and the auth guard automatically. Add it to `NAV_ITEMS` in
 `apps/web/src/components/app-sidebar.tsx` to show it in the navigation.
 
+**AI primitives.** `packages/ui/src/components/ai/` holds ten components for
+agent interfaces: `LoadingState`, `Thinking`, `StreamingText`, `ToolChips`,
+`TaskRows`, `ApprovalCard`, `ContextCards`, `CodeBlock`, `PromptBar`, `Chat`.
+They are ours — written against our tokens, not vendored — so unlike
+`components/`, they *are* meant to be edited. Import from the specific module
+(`@boilerslate/ui/components/ai/chat`) rather than the barrel so bundlers can
+drop what you do not use.
+
+They take data as props and emit callbacks; none of them talk to a model. Wire
+them to your own streaming endpoint.
+
 **Adding a UI component.** After `shadcn add`, render it on `/playground`
 (`apps/web/src/routes/_auth/playground.tsx`). That page exists so theme and
 radius changes can be checked against the whole library on one screen; a

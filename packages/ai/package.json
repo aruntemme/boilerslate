@@ -1,0 +1,30 @@
+{
+	"name": "@boilerslate/ai",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts",
+		"./catalog": "./src/catalog.ts",
+		"./crypto": "./src/crypto.ts",
+		"./registry": "./src/registry.ts",
+		"./tools": "./src/tools.ts"
+	},
+	"scripts": {
+		"check-types": "tsc --noEmit",
+		"test": "bun test"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/bun": "catalog:",
+		"@boilerslate/config": "workspace:*"
+	},
+	"dependencies": {
+		"@ai-sdk/anthropic": "^4",
+		"@ai-sdk/google": "^4",
+		"@ai-sdk/openai": "^4",
+		"@ai-sdk/openai-compatible": "^3",
+		"ai": "^7",
+		"zod": "^4.4.3"
+	}
+}

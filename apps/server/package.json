@@ -21,7 +21,9 @@
 		"@orpc/server": "catalog:",
 		"@orpc/openapi": "catalog:",
 		"@orpc/zod": "catalog:",
-		"better-auth": "catalog:"
+		"better-auth": "catalog:",
+		"@boilerslate/ai": "workspace:*",
+		"ai": "^7.0.79"
 	},
 	"devDependencies": {
 		"typescript": "catalog:",

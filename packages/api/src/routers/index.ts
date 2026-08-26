@@ -1,7 +1,9 @@
 import type { RouterClient } from "@orpc/server";
 import { protectedProcedure, publicProcedure } from "../index";
+import { aiRouter } from "./ai";
 
 export const appRouter = {
+	ai: aiRouter,
 	healthCheck: publicProcedure.handler(() => {
 		return "OK";
 	}),

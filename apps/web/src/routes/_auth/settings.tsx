@@ -12,6 +12,7 @@ import { type Mode, RADII, THEMES } from "@boilerslate/ui/lib/themes";
 import { cn } from "@boilerslate/ui/lib/utils";
 import { createFileRoute } from "@tanstack/react-router";
 import { Check, Monitor, Moon, RotateCcw, Sun } from "lucide-react";
+import { AiProviderSettings } from "@/components/ai-provider-settings";
 import { useTheme } from "@/components/theme-provider";
 
 export const Route = createFileRoute("/_auth/settings")({
@@ -56,6 +57,8 @@ function RouteComponent() {
 					</div>
 				</CardContent>
 			</Card>
+
+			<AiProviderSettings />
 
 			<Card>
 				<CardHeader>

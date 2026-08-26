@@ -10,6 +10,7 @@ import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { aiChat } from "./ai-chat";
 
 const app = new Hono();
 
@@ -70,6 +71,8 @@ app.use("/*", async (c, next) => {
 
 	await next();
 });
+
+app.route("/", aiChat);
 
 app.get("/", (c) => {
 	return c.text("OK");

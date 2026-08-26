@@ -30,23 +30,25 @@ for (const target of targets) {
 	console.log(`create ${target}`);
 }
 
-// Fill in an auth secret if the copied file left it blank.
+// Fill in any secret the copied file left blank.
 const serverEnv = join(root, "apps/server/.env");
 if (existsSync(serverEnv)) {
-	const contents = await readFile(serverEnv, "utf8");
-	if (/^BETTER_AUTH_SECRET=\s*$/m.test(contents)) {
+	let contents = await readFile(serverEnv, "utf8");
+	let changed = false;
+
+	for (const key of ["BETTER_AUTH_SECRET", "ENCRYPTION_KEY"]) {
+		const blank = new RegExp(`^${key}=\\s*$`, "m");
+		if (!blank.test(contents)) continue;
+
 		const secret = Buffer.from(
 			crypto.getRandomValues(new Uint8Array(32)),
 		).toString("base64");
-		await writeFile(
-			serverEnv,
-			contents.replace(
-				/^BETTER_AUTH_SECRET=\s*$/m,
-				`BETTER_AUTH_SECRET=${secret}`,
-			),
-		);
-		console.log("create BETTER_AUTH_SECRET");
+		contents = contents.replace(blank, `${key}=${secret}`);
+		changed = true;
+		console.log(`create ${key}`);
 	}
+
+	if (changed) await writeFile(serverEnv, contents);
 }
 
 console.log(`

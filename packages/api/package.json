@@ -24,6 +24,8 @@
 		"@orpc/server": "catalog:",
 		"@orpc/client": "catalog:",
 		"@orpc/openapi": "catalog:",
-		"@orpc/zod": "catalog:"
+		"@orpc/zod": "catalog:",
+		"@boilerslate/ai": "workspace:*",
+		"drizzle-orm": "^0.45.2"
 	}
 }

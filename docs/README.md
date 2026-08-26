@@ -6,6 +6,7 @@
 | [Architecture](architecture.md) | Layout, the type-safety chain, request path, database, testing |
 | [Design system](design-system.md) | Themes, tokens, radius, charts, Base UI gotchas |
 | [Multi-tenancy](multi-tenancy.md) | Organizations, roles, and the scoping rule you must not forget |
+| [AI](ai.md) | Providers, credentials, tool calling, the chat endpoint |
 | [AI components](ai-components.md) | The ten agent-interface primitives |
 | [Deployment](deployment.md) | Docker, going to production, CI |
 

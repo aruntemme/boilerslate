@@ -22,6 +22,7 @@ Web on <http://localhost:3001>, API on <http://localhost:3000>.
 - **[Better Auth](https://better-auth.com)** — email/password auth plus organizations
 - **[shadcn/ui](https://ui.shadcn.com)** (`base-nova`, on [Base UI](https://base-ui.com)) + **Tailwind v4**
 - **[Recharts](https://recharts.org)** — charts wired to the theme
+- **[AI SDK](https://ai-sdk.dev)** — multi-provider LLM calls with tool calling
 - **[Turborepo](https://turbo.build)** + **[Biome](https://biomejs.dev)** — tasks, linting, formatting
 
 Types flow from the database schema through to the React client with no code
@@ -38,6 +39,10 @@ organization id directly.
 orange, amber and neutral, each in light and dark — theme and mode are
 independent axes, switchable at runtime and applied before first paint so there
 is no flash on load. Corner radius is adjustable too.
+
+**Multi-provider AI with tool calling.** Anthropic, OpenAI, Google, or any
+OpenAI-compatible endpoint, switchable per organization from Settings. Keys are
+encrypted before storage and never sent back to the browser.
 
 **36 UI components plus ten AI primitives** — streaming text with citations,
 reasoning traces, tool-call chips, live task status, human-in-the-loop
@@ -101,6 +106,7 @@ internet.
 - [Architecture](docs/architecture.md) — layout, type safety, testing
 - [Design system](docs/design-system.md) — themes, tokens, charts
 - [Multi-tenancy](docs/multi-tenancy.md) — organizations and scoping
+- [AI](docs/ai.md) — providers, credentials, tool calling
 - [AI components](docs/ai-components.md) — the ten agent primitives
 - [Deployment](docs/deployment.md) — Docker, production, CI
 

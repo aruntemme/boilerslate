@@ -29,6 +29,20 @@
       "when": 1787761645437,
       "tag": "0003_invitation_team",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787762513830,
+      "tag": "0004_drop_old_ai",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787762537166,
+      "tag": "0005_ai_provider_instances",
+      "breakpoints": true
     }
   ]
 }

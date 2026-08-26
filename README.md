@@ -41,8 +41,10 @@ orange, amber and neutral, each in light and dark — theme and mode are
 independent axes, switchable at runtime and applied before first paint so there
 is no flash on load. Corner radius is adjustable too.
 
-**Multi-provider AI with tool calling.** Anthropic, OpenAI, Google, or any
-OpenAI-compatible endpoint, switchable per organization from Settings. Keys are
+**Multi-provider AI with tool calling.** Configure as many providers as you
+like — several Anthropic keys, several OpenAI-compatible endpoints — each with
+its own credentials. Models are discovered live from each provider, with a
+connection test, and you choose all of them or an allow-list. Keys are
 encrypted before storage and never sent back to the browser.
 
 **36 UI components plus ten AI primitives** — streaming text with citations,

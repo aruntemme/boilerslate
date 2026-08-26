@@ -1,148 +1,73 @@
 /**
- * Provider and model catalog.
+ * Base provider kinds.
  *
- * A static list on purpose: the settings UI has to render providers and models
- * that are not configured yet, so it cannot ask a live API what exists. Prices
- * are per million tokens and are indicative — check the provider before you
- * bill anyone on them.
+ * A "kind" is the wire protocol and SDK adapter. A *provider* is a configured
+ * instance of a kind — you can have several of the same kind (a production and
+ * a staging Anthropic key, three different OpenAI-compatible endpoints), each
+ * with its own credentials and its own set of enabled models.
+ *
+ * There is no static model list any more: models are discovered from the
+ * provider itself, because any hard-coded list goes stale the week it is
+ * written.
  */
 
-export type ProviderId = "anthropic" | "openai" | "google" | "compatible";
+export type ProviderKind = "anthropic" | "openai" | "google" | "compatible";
 
-export interface ModelInfo {
-	id: string;
+export interface ProviderKindInfo {
+	id: ProviderKind;
 	label: string;
-	/** Context window in tokens. */
-	context: number;
-	/** USD per million input / output tokens. Indicative. */
-	price?: { input: number; output: number };
-	/** Whether the model can call tools. */
-	tools: boolean;
-	/** Whether the model exposes a reasoning/thinking mode. */
-	reasoning?: boolean;
-}
-
-export interface ProviderInfo {
-	id: ProviderId;
-	label: string;
-	/** Env var read as the fallback credential when no org key is stored. */
-	envKey: string;
-	/** Providers that need a base URL (self-hosted, gateways, Ollama, vLLM). */
-	requiresBaseUrl?: boolean;
+	/** Shown as the placeholder when adding a provider of this kind. */
+	example: string;
+	/** Base URL is mandatory for this kind. */
+	requiresBaseUrl: boolean;
+	/** Default base URL when the user does not supply one. */
+	defaultBaseUrl?: string;
 	docs: string;
-	models: ModelInfo[];
+	hint: string;
 }
 
-export const PROVIDERS: readonly ProviderInfo[] = [
+export const PROVIDER_KINDS: readonly ProviderKindInfo[] = [
 	{
 		id: "anthropic",
 		label: "Anthropic",
-		envKey: "ANTHROPIC_API_KEY",
+		example: "Claude — production",
+		requiresBaseUrl: false,
+		defaultBaseUrl: "https://api.anthropic.com/v1",
 		docs: "https://docs.claude.com",
-		models: [
-			{
-				id: "claude-opus-5",
-				label: "Claude Opus 5",
-				context: 1_000_000,
-				price: { input: 5, output: 25 },
-				tools: true,
-				reasoning: true,
-			},
-			{
-				id: "claude-sonnet-5",
-				label: "Claude Sonnet 5",
-				context: 1_000_000,
-				price: { input: 2, output: 10 },
-				tools: true,
-				reasoning: true,
-			},
-			{
-				id: "claude-haiku-4-5",
-				label: "Claude Haiku 4.5",
-				context: 200_000,
-				price: { input: 1, output: 5 },
-				tools: true,
-			},
-		],
+		hint: "Claude models. Keys start with sk-ant-.",
 	},
 	{
 		id: "openai",
 		label: "OpenAI",
-		envKey: "OPENAI_API_KEY",
+		example: "OpenAI — production",
+		requiresBaseUrl: false,
+		defaultBaseUrl: "https://api.openai.com/v1",
 		docs: "https://platform.openai.com/docs",
-		models: [
-			{
-				id: "gpt-5",
-				label: "GPT-5",
-				context: 400_000,
-				tools: true,
-				reasoning: true,
-			},
-			{ id: "gpt-5-mini", label: "GPT-5 mini", context: 400_000, tools: true },
-			{
-				id: "o4-mini",
-				label: "o4-mini",
-				context: 200_000,
-				tools: true,
-				reasoning: true,
-			},
-		],
+		hint: "Keys start with sk-.",
 	},
 	{
 		id: "google",
 		label: "Google",
-		envKey: "GOOGLE_GENERATIVE_AI_API_KEY",
+		example: "Gemini",
+		requiresBaseUrl: false,
+		defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
 		docs: "https://ai.google.dev/gemini-api/docs",
-		models: [
-			{
-				id: "gemini-3-pro",
-				label: "Gemini 3 Pro",
-				context: 1_000_000,
-				tools: true,
-				reasoning: true,
-			},
-			{
-				id: "gemini-3-flash",
-				label: "Gemini 3 Flash",
-				context: 1_000_000,
-				tools: true,
-			},
-		],
+		hint: "Gemini models via the Generative Language API.",
 	},
 	{
 		id: "compatible",
 		label: "OpenAI-compatible",
-		envKey: "COMPATIBLE_API_KEY",
+		example: "Ollama — local",
 		requiresBaseUrl: true,
 		docs: "https://ai-sdk.dev/providers/openai-compatible-providers",
-		models: [
-			// Anything served behind an OpenAI-compatible endpoint: Ollama, vLLM,
-			// LM Studio, Together, Groq, OpenRouter. The id is whatever that
-			// endpoint calls the model, so these are examples, not a fixed list.
-			{
-				id: "llama-3.3-70b",
-				label: "Llama 3.3 70B",
-				context: 128_000,
-				tools: true,
-			},
-			{
-				id: "qwen3-coder",
-				label: "Qwen3 Coder",
-				context: 256_000,
-				tools: true,
-			},
-		],
+		hint: "Ollama, vLLM, LM Studio, Groq, OpenRouter, Together — anything speaking the OpenAI wire format.",
 	},
 ] as const;
 
-export function getProvider(id: string): ProviderInfo | undefined {
-	return PROVIDERS.find((p) => p.id === id);
+export function getKind(id: string): ProviderKindInfo | undefined {
+	return PROVIDER_KINDS.find((k) => k.id === id);
 }
 
-export function isProviderId(value: unknown): value is ProviderId {
-	return PROVIDERS.some((p) => p.id === value);
+export function isProviderKind(value: unknown): value is ProviderKind {
+	return PROVIDER_KINDS.some((k) => k.id === value);
 }
-
-/** The default used when an organization has configured nothing. */
-export const DEFAULT_PROVIDER: ProviderId = "anthropic";
-export const DEFAULT_MODEL = "claude-opus-5";

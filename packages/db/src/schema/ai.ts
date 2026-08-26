@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
 import {
 	index,
+	jsonb,
 	pgTable,
 	text,
 	timestamp,
@@ -9,28 +10,41 @@ import {
 import { organization } from "./auth";
 
 /**
- * Per-organization AI provider configuration.
+ * A configured provider instance.
+ *
+ * Several rows may share a `kind` — two Anthropic keys, three OpenAI-compatible
+ * endpoints — each with its own name, credentials and model selection.
  *
  * `apiKeyEncrypted` holds an AES-256-GCM envelope, never a plaintext key, and
- * is never selected into any response — the API returns `apiKeyHint` instead.
- * One row per (organization, provider).
+ * is never selected into a response; the API returns `apiKeyHint` instead.
  */
-export const aiProviderConfig = pgTable(
-	"ai_provider_config",
+export const aiProvider = pgTable(
+	"ai_provider",
 	{
 		id: text("id").primaryKey(),
 		organizationId: text("organization_id")
 			.notNull()
 			.references(() => organization.id, { onDelete: "cascade" }),
-		/** Matches a ProviderId in @boilerslate/ai. */
-		provider: text("provider").notNull(),
+		/** User-chosen label, e.g. "Claude — production". Unique per org. */
+		name: text("name").notNull(),
+		/** Base provider kind: anthropic | openai | google | compatible. */
+		kind: text("kind").notNull(),
 		apiKeyEncrypted: text("api_key_encrypted"),
-		/** Masked form shown in the UI, e.g. "sk-…4f2a". Safe to return. */
 		apiKeyHint: text("api_key_hint"),
-		/** Required for OpenAI-compatible endpoints (Ollama, vLLM, gateways). */
 		baseUrl: text("base_url"),
-		/** Model used when this provider is selected. */
-		defaultModel: text("default_model"),
+		/**
+		 * Models the organization has chosen to expose.
+		 * `null` means "all models this provider reports" — so newly released
+		 * models appear without anyone editing the configuration.
+		 */
+		enabledModels: jsonb("enabled_models").$type<string[] | null>(),
+		/** Last successful discovery, cached so the UI need not re-fetch. */
+		availableModels: jsonb("available_models").$type<
+			{ id: string; label: string }[] | null
+		>(),
+		lastCheckedAt: timestamp("last_checked_at"),
+		/** Message from the last failed check; null when the last check passed. */
+		lastError: text("last_error"),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at")
 			.defaultNow()
@@ -38,23 +52,22 @@ export const aiProviderConfig = pgTable(
 			.notNull(),
 	},
 	(table) => [
-		uniqueIndex("ai_provider_config_org_provider_uidx").on(
+		uniqueIndex("ai_provider_org_name_uidx").on(
 			table.organizationId,
-			table.provider,
+			table.name,
 		),
-		index("ai_provider_config_organizationId_idx").on(table.organizationId),
+		index("ai_provider_organizationId_idx").on(table.organizationId),
 	],
 );
 
-/**
- * Which provider and model an organization is currently using.
- * Separate from the credential rows so switching model does not touch secrets.
- */
+/** Which provider instance and model the organization is currently using. */
 export const aiSettings = pgTable("ai_settings", {
 	organizationId: text("organization_id")
 		.primaryKey()
 		.references(() => organization.id, { onDelete: "cascade" }),
-	activeProvider: text("active_provider"),
+	activeProviderId: text("active_provider_id").references(() => aiProvider.id, {
+		onDelete: "set null",
+	}),
 	activeModel: text("active_model"),
 	systemPrompt: text("system_prompt"),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -64,19 +77,20 @@ export const aiSettings = pgTable("ai_settings", {
 		.notNull(),
 });
 
-export const aiProviderConfigRelations = relations(
-	aiProviderConfig,
-	({ one }) => ({
-		organization: one(organization, {
-			fields: [aiProviderConfig.organizationId],
-			references: [organization.id],
-		}),
+export const aiProviderRelations = relations(aiProvider, ({ one }) => ({
+	organization: one(organization, {
+		fields: [aiProvider.organizationId],
+		references: [organization.id],
 	}),
-);
+}));
 
 export const aiSettingsRelations = relations(aiSettings, ({ one }) => ({
 	organization: one(organization, {
 		fields: [aiSettings.organizationId],
 		references: [organization.id],
+	}),
+	activeProvider: one(aiProvider, {
+		fields: [aiSettings.activeProviderId],
+		references: [aiProvider.id],
 	}),
 }));

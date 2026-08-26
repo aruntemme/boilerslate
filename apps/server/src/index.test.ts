@@ -193,7 +193,6 @@ describe("multi-tenancy", () => {
 });
 
 describe("ai provider configuration", () => {
-	/** Signs up, creates an organization, and returns a cookie scoped to it. */
 	async function signUpWithOrg(prefix: string) {
 		const { cookie } = await signUp(prefix);
 		const slug = `org-${crypto.randomUUID().slice(0, 8)}`;
@@ -203,16 +202,12 @@ describe("ai provider configuration", () => {
 			cookie,
 		});
 		expect(created.status).toBe(200);
-
-		// Organization-scoped procedures read the *active* organization from the
-		// session, which create() does not set on its own.
 		const activated = await call("/api/auth/organization/set-active", {
 			method: "POST",
 			body: JSON.stringify({ organizationId: created.body.id }),
 			cookie,
 		});
 		expect(activated.status).toBe(200);
-
 		return { cookie, organizationId: created.body.id as string };
 	}
 
@@ -225,10 +220,23 @@ describe("ai provider configuration", () => {
 		});
 	}
 
+	async function addProvider(
+		cookie: string,
+		overrides: Record<string, unknown> = {},
+	) {
+		const res = await rpc("ai/createProvider", cookie, {
+			name: `Provider ${crypto.randomUUID().slice(0, 8)}`,
+			kind: "anthropic",
+			apiKey: `sk-ant-${crypto.randomUUID()}`,
+			...overrides,
+		});
+		return res;
+	}
+
 	test("rejects anonymous callers", async () => {
 		const res = await call("/rpc/ai/listProviders", {
 			method: "POST",
-			body: "{}",
+			body: JSON.stringify({ json: {} }),
 		});
 		expect(res.status).toBe(401);
 	});
@@ -239,111 +247,238 @@ describe("ai provider configuration", () => {
 		expect(res.status).toBe(403);
 	});
 
-	test("lists the provider catalog", async () => {
-		const { cookie } = await signUpWithOrg("ai-catalog");
+	test("lists the base provider kinds", async () => {
+		const { cookie } = await signUpWithOrg("ai-kinds");
+		const res = await rpc("ai/listKinds", cookie);
+		expect(res.status).toBe(200);
+		const ids = res.body.json.map((k: Json) => k.id);
+		expect(ids).toContain("anthropic");
+		expect(ids).toContain("compatible");
+	});
+
+	test("starts with no providers", async () => {
+		const { cookie } = await signUpWithOrg("ai-empty");
 		const res = await rpc("ai/listProviders", cookie);
 		expect(res.status).toBe(200);
-
-		const ids = res.body.json.map((p: Json) => p.id);
-		expect(ids).toContain("anthropic");
-		expect(ids).toContain("openai");
-
-		const anthropic = res.body.json.find((p: Json) => p.id === "anthropic");
-		expect(anthropic.models.length).toBeGreaterThan(0);
-		expect(anthropic.source).toBe("none");
+		expect(res.body.json).toEqual([]);
 	});
 
 	test("stores a key and never returns it", async () => {
 		const { cookie } = await signUpWithOrg("ai-store");
 		const apiKey = `sk-ant-secret-${crypto.randomUUID()}`;
 
-		const saved = await rpc("ai/saveProvider", cookie, {
-			provider: "anthropic",
-			apiKey,
-		});
-		expect(saved.status).toBe(200);
+		const created = await addProvider(cookie, { name: "Claude prod", apiKey });
+		expect(created.status).toBe(200);
 
 		const listed = await rpc("ai/listProviders", cookie);
-		const anthropic = listed.body.json.find((p: Json) => p.id === "anthropic");
-
-		expect(anthropic.source).toBe("stored");
-		expect(anthropic.configured).toBe(true);
-		// The hint identifies the key without revealing it.
-		expect(anthropic.apiKeyHint).toBeTruthy();
-		expect(anthropic.apiKeyHint).not.toBe(apiKey);
-
-		// The plaintext must not appear anywhere in the response.
+		const provider = listed.body.json[0];
+		expect(provider.name).toBe("Claude prod");
+		expect(provider.apiKeyHint).toBeTruthy();
+		expect(provider.apiKeyHint).not.toBe(apiKey);
 		expect(JSON.stringify(listed.body)).not.toContain(apiKey);
 	});
 
-	test("isolates provider config between organizations", async () => {
+	test("allows several providers of the same kind", async () => {
+		const { cookie } = await signUpWithOrg("ai-multi");
+		expect((await addProvider(cookie, { name: "Claude prod" })).status).toBe(
+			200,
+		);
+		expect((await addProvider(cookie, { name: "Claude dev" })).status).toBe(
+			200,
+		);
+		expect(
+			(
+				await addProvider(cookie, {
+					name: "Ollama",
+					kind: "compatible",
+					baseUrl: "http://localhost:11434/v1",
+				})
+			).status,
+		).toBe(200);
+
+		const listed = await rpc("ai/listProviders", cookie);
+		expect(listed.body.json).toHaveLength(3);
+		expect(
+			listed.body.json.filter((p: Json) => p.kind === "anthropic"),
+		).toHaveLength(2);
+	});
+
+	test("rejects a duplicate name within an organization", async () => {
+		const { cookie } = await signUpWithOrg("ai-dupe");
+		expect((await addProvider(cookie, { name: "Same" })).status).toBe(200);
+		const again = await addProvider(cookie, { name: "Same" });
+		expect(again.status).toBeGreaterThanOrEqual(400);
+	});
+
+	test("requires a base URL for an OpenAI-compatible provider", async () => {
+		const { cookie } = await signUpWithOrg("ai-compat");
+		const res = await addProvider(cookie, {
+			name: "Local",
+			kind: "compatible",
+			baseUrl: "",
+		});
+		expect(res.status).toBeGreaterThanOrEqual(400);
+	});
+
+	test("rejects an unknown kind", async () => {
+		const { cookie } = await signUpWithOrg("ai-unknown");
+		const res = await addProvider(cookie, { kind: "not-a-kind" });
+		expect(res.status).toBeGreaterThanOrEqual(400);
+	});
+
+	test("isolates providers between organizations", async () => {
 		const owner = await signUpWithOrg("ai-tenant-a");
 		const apiKey = `sk-tenant-a-${crypto.randomUUID()}`;
-		await rpc("ai/saveProvider", owner.cookie, {
-			provider: "openai",
+		const created = await addProvider(owner.cookie, {
+			name: "Tenant A key",
 			apiKey,
 		});
+		const providerId = created.body.json.id;
 
 		const outsider = await signUpWithOrg("ai-tenant-b");
 		const listed = await rpc("ai/listProviders", outsider.cookie);
-		expect(listed.status).toBe(200);
-
-		const openai = listed.body.json.find((p: Json) => p.id === "openai");
-		// Tenant B must see no stored key, and certainly not tenant A's.
-		expect(openai.source).not.toBe("stored");
-		expect(openai.apiKeyHint).toBeNull();
+		expect(listed.body.json).toEqual([]);
 		expect(JSON.stringify(listed.body)).not.toContain(apiKey);
+
+		// Naming the id directly must not work either.
+		const stolen = await rpc("ai/testConnection", outsider.cookie, {
+			providerId,
+		});
+		expect(stolen.status).toBeGreaterThanOrEqual(400);
+
+		const deleted = await rpc("ai/deleteProvider", outsider.cookie, {
+			providerId,
+		});
+		expect(deleted.status).toBeGreaterThanOrEqual(400);
+
+		// And it is still there for its owner.
+		const stillThere = await rpc("ai/listProviders", owner.cookie);
+		expect(stillThere.body.json).toHaveLength(1);
 	});
 
-	test("removing a key clears the stored credential", async () => {
-		const { cookie } = await signUpWithOrg("ai-remove");
-		await rpc("ai/saveProvider", cookie, {
-			provider: "anthropic",
-			apiKey: "sk-to-be-removed-0123456789",
+	test("reports a failure when the credential is rejected", async () => {
+		const { cookie } = await signUpWithOrg("ai-badkey");
+		// Points at a port nothing is listening on, so the fetch fails fast
+		// without reaching a real provider.
+		const created = await addProvider(cookie, {
+			name: "Dead endpoint",
+			kind: "compatible",
+			baseUrl: "http://127.0.0.1:9/v1",
+			apiKey: "irrelevant",
 		});
+		expect(created.status).toBe(200);
 
-		const removed = await rpc("ai/removeProvider", cookie, {
-			provider: "anthropic",
+		const tested = await rpc("ai/testConnection", cookie, {
+			providerId: created.body.json.id,
 		});
-		expect(removed.status).toBe(200);
+		expect(tested.status).toBe(200);
+		expect(tested.body.json.ok).toBe(false);
+		expect(tested.body.json.error).toBeTruthy();
+
+		// The failure is recorded so the UI can show it without re-testing.
+		const listed = await rpc("ai/listProviders", cookie);
+		expect(listed.body.json[0].lastError).toBeTruthy();
+	});
+
+	test("replacing a key clears the previous check result", async () => {
+		const { cookie } = await signUpWithOrg("ai-replace");
+		const created = await addProvider(cookie, {
+			name: "Rotating",
+			kind: "compatible",
+			baseUrl: "http://127.0.0.1:9/v1",
+		});
+		const providerId = created.body.json.id;
+		await rpc("ai/testConnection", cookie, { providerId });
+
+		const updated = await rpc("ai/updateProvider", cookie, {
+			providerId,
+			apiKey: "a-new-key-entirely",
+		});
+		expect(updated.status).toBe(200);
 
 		const listed = await rpc("ai/listProviders", cookie);
-		const anthropic = listed.body.json.find((p: Json) => p.id === "anthropic");
-		expect(anthropic.apiKeyHint).toBeNull();
+		expect(listed.body.json[0].lastError).toBeNull();
+		expect(listed.body.json[0].lastCheckedAt).toBeNull();
 	});
 
-	test("requires a base URL for the OpenAI-compatible provider", async () => {
-		const { cookie } = await signUpWithOrg("ai-compat");
-		const res = await rpc("ai/saveProvider", cookie, {
-			provider: "compatible",
-			apiKey: "local-key-0123456789",
+	test("model selection round-trips, and null means all", async () => {
+		const { cookie } = await signUpWithOrg("ai-models");
+		const created = await addProvider(cookie, { name: "Picker" });
+		const providerId = created.body.json.id;
+
+		const picked = await rpc("ai/setEnabledModels", cookie, {
+			providerId,
+			models: ["model-a", "model-b"],
 		});
-		expect(res.status).toBeGreaterThanOrEqual(400);
-	});
+		expect(picked.status).toBe(200);
 
-	test("rejects an unknown provider", async () => {
-		const { cookie } = await signUpWithOrg("ai-unknown");
-		const res = await rpc("ai/saveProvider", cookie, {
-			provider: "not-a-provider",
-			apiKey: "x",
+		let listed = await rpc("ai/listProviders", cookie);
+		expect(listed.body.json[0].enabledModels).toEqual(["model-a", "model-b"]);
+
+		const all = await rpc("ai/setEnabledModels", cookie, {
+			providerId,
+			models: null,
 		});
-		expect(res.status).toBeGreaterThanOrEqual(400);
+		expect(all.status).toBe(200);
+
+		listed = await rpc("ai/listProviders", cookie);
+		expect(listed.body.json[0].enabledModels).toBeNull();
 	});
 
-	test("round-trips the active model and system prompt", async () => {
-		const { cookie } = await signUpWithOrg("ai-settings");
+	test("refuses to activate a model the provider does not offer", async () => {
+		const { cookie } = await signUpWithOrg("ai-activate");
+		const created = await addProvider(cookie, { name: "Restricted" });
+		const providerId = created.body.json.id;
 
-		const saved = await rpc("ai/saveSettings", cookie, {
-			activeProvider: "openai",
-			activeModel: "gpt-5-mini",
+		await rpc("ai/setEnabledModels", cookie, {
+			providerId,
+			models: ["allowed-model"],
+		});
+
+		const bad = await rpc("ai/setActive", cookie, {
+			providerId,
+			model: "some-other-model",
+		});
+		expect(bad.status).toBeGreaterThanOrEqual(400);
+
+		const good = await rpc("ai/setActive", cookie, {
+			providerId,
+			model: "allowed-model",
+		});
+		expect(good.status).toBe(200);
+
+		const settings = await rpc("ai/getSettings", cookie);
+		expect(settings.body.json.activeProviderId).toBe(providerId);
+		expect(settings.body.json.activeModel).toBe("allowed-model");
+	});
+
+	test("deleting the active provider clears the selection", async () => {
+		const { cookie } = await signUpWithOrg("ai-delete-active");
+		const created = await addProvider(cookie, { name: "Temporary" });
+		const providerId = created.body.json.id;
+
+		await rpc("ai/setEnabledModels", cookie, { providerId, models: ["m1"] });
+		await rpc("ai/setActive", cookie, { providerId, model: "m1" });
+
+		const deleted = await rpc("ai/deleteProvider", cookie, { providerId });
+		expect(deleted.status).toBe(200);
+
+		// The FK is ON DELETE SET NULL, so the app never points at a dead row.
+		const settings = await rpc("ai/getSettings", cookie);
+		expect(settings.body.json.activeProviderId).toBeNull();
+	});
+
+	test("stores the system prompt", async () => {
+		const { cookie } = await signUpWithOrg("ai-prompt");
+		const saved = await rpc("ai/setActive", cookie, {
+			providerId: null,
+			model: null,
 			systemPrompt: "Be terse.",
 		});
 		expect(saved.status).toBe(200);
 
-		const got = await rpc("ai/getSettings", cookie);
-		expect(got.body.json.activeProvider).toBe("openai");
-		expect(got.body.json.activeModel).toBe("gpt-5-mini");
-		expect(got.body.json.systemPrompt).toBe("Be terse.");
+		const settings = await rpc("ai/getSettings", cookie);
+		expect(settings.body.json.systemPrompt).toBe("Be terse.");
 	});
 });
 

@@ -158,8 +158,12 @@ no test.
 first. Reading `process.env` directly anywhere else is a bug — the schema is
 what makes a missing variable fail at boot instead of at 3am.
 
-**AI.** `packages/ai` holds the provider catalog, credential encryption, the
-model registry and the tool definitions; `POST /ai/chat` streams. Two rules:
+**AI.** `packages/ai` holds the provider kinds, credential encryption, live
+model discovery, the model registry and the tool definitions; `POST /ai/chat`
+streams. A *kind* is a protocol (anthropic/openai/google/compatible); a
+*provider* is a named instance of one, and there can be several of the same
+kind. Models come from the provider's own endpoint — never hard-code a model
+list. Two rules:
 
 - Stored API keys are **write-only**. Never select `apiKeyEncrypted` into a
   response, and never add a procedure that returns a decrypted key.

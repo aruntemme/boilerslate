@@ -5,23 +5,20 @@
  * SDK returns a streaming `Response` directly, and oRPC's typed envelope would
  * only get in the way of a token stream.
  *
- * Provider, model and credentials all resolve server-side from the caller's
- * organization. The client picks nothing — a client that could name its own
- * model could also name a provider whose key it should not be able to spend.
+ * The provider instance, model and credentials all resolve server-side from
+ * the caller's organization. The client sends messages and nothing else — a
+ * client that could name its own provider could spend a key it should not
+ * reach.
  */
 import {
 	createModel,
 	createTools,
-	DEFAULT_MODEL,
-	DEFAULT_PROVIDER,
 	decryptSecret,
-	getProvider,
-	isProviderId,
-	resolveCredentials,
+	isProviderKind,
 } from "@boilerslate/ai";
 import { auth } from "@boilerslate/auth";
 import { db } from "@boilerslate/db";
-import { aiProviderConfig, aiSettings } from "@boilerslate/db/schema/ai";
+import { aiProvider, aiSettings } from "@boilerslate/db/schema/ai";
 import {
 	convertToModelMessages,
 	stepCountIs,
@@ -50,53 +47,57 @@ aiChat.post("/ai/chat", async (c) => {
 		return c.json({ error: "No messages." }, 400);
 	}
 
-	// Which provider and model this organization is using.
 	const [settings] = await db
 		.select()
 		.from(aiSettings)
 		.where(eq(aiSettings.organizationId, organizationId))
 		.limit(1);
 
-	const providerId = isProviderId(settings?.activeProvider)
-		? settings.activeProvider
-		: DEFAULT_PROVIDER;
-	const modelId = settings?.activeModel ?? DEFAULT_MODEL;
-
-	if (!getProvider(providerId)) {
-		return c.json({ error: `Unknown provider: ${providerId}` }, 400);
+	if (!settings?.activeProviderId || !settings.activeModel) {
+		return c.json({ error: "No active model. Choose one in Settings." }, 412);
 	}
 
-	// Stored credential, if this organization has one.
-	const [config] = await db
+	const [provider] = await db
 		.select()
-		.from(aiProviderConfig)
+		.from(aiProvider)
 		.where(
 			and(
-				eq(aiProviderConfig.organizationId, organizationId),
-				eq(aiProviderConfig.provider, providerId),
+				eq(aiProvider.id, settings.activeProviderId),
+				eq(aiProvider.organizationId, organizationId),
 			),
 		)
 		.limit(1);
 
-	let stored: { apiKey: string; baseUrl?: string } | null = null;
-	if (config?.apiKeyEncrypted) {
-		try {
-			stored = {
-				apiKey: decryptSecret(config.apiKeyEncrypted),
-				...(config.baseUrl ? { baseUrl: config.baseUrl } : {}),
-			};
-		} catch {
-			// A key encrypted under a different ENCRYPTION_KEY, or a corrupted
-			// row. Fall through to the env credential rather than 500.
-			stored = null;
-		}
+	if (!provider) {
+		return c.json({ error: "The active provider no longer exists." }, 412);
+	}
+	if (!isProviderKind(provider.kind)) {
+		return c.json({ error: `Unknown provider kind: ${provider.kind}` }, 400);
+	}
+	if (!provider.apiKeyEncrypted) {
+		return c.json({ error: `${provider.name} has no API key.` }, 412);
 	}
 
-	const credentials = resolveCredentials(providerId, stored);
-	if (!credentials) {
+	// Re-check the model against what the provider is offering. Settings
+	// validates on write, but the selection can go stale if models are
+	// disabled afterwards.
+	const allowed =
+		provider.enabledModels ?? (provider.availableModels ?? []).map((m) => m.id);
+	if (allowed.length > 0 && !allowed.includes(settings.activeModel)) {
+		return c.json(
+			{ error: `${settings.activeModel} is not enabled on ${provider.name}.` },
+			412,
+		);
+	}
+
+	let apiKey: string;
+	try {
+		apiKey = decryptSecret(provider.apiKeyEncrypted);
+	} catch {
 		return c.json(
 			{
-				error: `No credentials for ${providerId}. Add a key in Settings, or set the provider's environment variable.`,
+				error:
+					"The stored key could not be decrypted. ENCRYPTION_KEY may have changed.",
 			},
 			412,
 		);
@@ -106,9 +107,12 @@ aiChat.post("/ai/chat", async (c) => {
 		const modelMessages = await convertToModelMessages(messages);
 
 		const result = streamText({
-			model: createModel(providerId, modelId, credentials),
+			model: createModel(provider.kind, settings.activeModel, {
+				apiKey,
+				baseUrl: provider.baseUrl ?? undefined,
+			}),
 			system:
-				settings?.systemPrompt ||
+				settings.systemPrompt ||
 				"You are a helpful assistant embedded in a SaaS application. Be concise. Use the tools available to you rather than guessing at facts you can look up.",
 			messages: modelMessages,
 			tools: createTools({ organizationId, userId: session.user.id }),

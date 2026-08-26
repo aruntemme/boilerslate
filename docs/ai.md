@@ -21,7 +21,8 @@ own SDK directly — the abstraction is what you would be giving up.
 
 ```
 packages/ai/
-  catalog.ts   providers and models the UI can offer
+  catalog.ts   base provider kinds
+  models.ts    live model discovery / connection testing
   crypto.ts    AES-256-GCM envelope for stored credentials
   registry.ts  credentials → a live model
   tools.ts     the tools the model may call
@@ -29,44 +30,53 @@ apps/server/src/ai-chat.ts   POST /ai/chat — streaming, with tool calling
 packages/api/src/routers/ai.ts   provider configuration procedures
 ```
 
-## Providers
+## Providers are instances, not types
 
-Anthropic, OpenAI, Google, and any OpenAI-compatible endpoint (Ollama, vLLM,
-LM Studio, Groq, OpenRouter — anything that speaks the OpenAI wire format).
+A **kind** is the wire protocol and SDK adapter: `anthropic`, `openai`,
+`google`, `compatible`. A **provider** is a configured instance of a kind — so
+an organization can have several of the same kind:
 
-Add one by appending to `PROVIDERS` in `packages/ai/src/catalog.ts` and adding
-a case to `createModel` in `registry.ts`. The settings UI reads the catalog, so
-nothing else needs to change.
+```
+Claude — production     (anthropic, prod key)
+Claude — staging        (anthropic, dev key)
+Ollama — local          (compatible, http://localhost:11434/v1)
+Groq                    (compatible, https://api.groq.com/openai/v1)
+```
 
-## Where credentials live
+Each has its own name, credentials, base URL and model selection. Names are
+unique within an organization.
 
-Two sources, checked in order:
+Add a kind by appending to `PROVIDER_KINDS` in `packages/ai/src/catalog.ts`,
+adding a case to `createModel` in `registry.ts`, and a branch in `listModels`
+in `models.ts`. Nothing else changes — the UI reads the kind list from the API.
 
-1. **Stored per organization** — entered through Settings, encrypted with
-   AES-256-GCM under `ENCRYPTION_KEY` before it reaches the database.
-2. **Server environment** — `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and so on.
+## Models are discovered, not listed
 
-Single-tenant deployments can ignore the UI entirely and just set env vars.
-Multi-tenant SaaS can let each customer bring their own key.
+There is no static model catalogue. `ai.testConnection` calls the provider's
+own models endpoint and caches the result on the provider row:
 
-### The rule about keys
+| Kind | Endpoint |
+| --- | --- |
+| anthropic | `GET {base}/models` with `x-api-key` + `anthropic-version` |
+| openai / compatible | `GET {base}/models` with `Authorization: Bearer` |
+| google | `GET {base}/models?key=…`, filtered to models supporting `generateContent` |
 
-**A stored key is write-only.** It goes in through `saveProvider`, is encrypted
-immediately, and is never selected into any response — `listProviders`
-deliberately does not select the `apiKeyEncrypted` column. What the UI shows is
-`apiKeyHint`, a masked fragment like `sk-…4f2a`.
+Listing models *is* the connection test — reaching the catalogue is exactly the
+proof that the credential works, so the two are one call. A hard-coded list
+would be wrong within weeks and could never know which models *your* key can
+actually reach.
 
-Tests cover this directly: `stores a key and never returns it` asserts the
-plaintext appears nowhere in the response body, and `isolates provider config
-between organizations` asserts one tenant's key never reaches another.
+### Choosing which models to expose
 
-Encryption protects a leaked database dump. It does not protect a compromised
-server, which holds the master key by necessity — swap `getMasterKey` in
-`crypto.ts` for a KMS call if you need that boundary.
+`enabledModels` is either an array or `null`:
 
-> Rotating `ENCRYPTION_KEY` makes every stored key undecryptable. The chat
-> endpoint falls back to the env credential rather than erroring, but customers
-> will have to re-enter their keys. Re-encrypt before rotating if that matters.
+- **`null` means all** — whatever the provider currently reports. New models
+  appear without anyone editing the configuration. This is the default.
+- **An array** is an allow-list.
+
+`setActive` refuses a model that is not enabled, and the chat endpoint
+re-checks at call time, because a selection can go stale if models are disabled
+afterwards.
 
 ## Tool calling
 
@@ -116,8 +126,8 @@ credentials for the selected provider.
 `PromptBar`, `StreamingText`, `ToolChips`. Wire them to the endpoint with the
 AI SDK's `useChat` from `@ai-sdk/react`, pointing at `/ai/chat`.
 
-## Model IDs go stale
+## Rotating the encryption key
 
-The catalog is a static list with hard-coded model ids and indicative prices.
-Providers rename and retire models faster than a boilerplate can track — treat
-`catalog.ts` as something you check when you fork, not as a source of truth.
+Rotating `ENCRYPTION_KEY` makes every stored provider key undecryptable. The
+chat endpoint returns a readable 412 rather than a 500, but customers will have
+to re-enter their keys. Re-encrypt before rotating if that matters.

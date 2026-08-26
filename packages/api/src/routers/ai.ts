@@ -1,152 +1,276 @@
 /**
- * AI provider configuration.
+ * AI provider instances.
  *
- * Every procedure here is organization-scoped. API keys are accepted,
- * encrypted and stored — but never returned. `list` returns a masked hint so
- * the UI can show which key is configured without ever holding the secret.
+ * A provider is a *named instance* of a base kind, so an organization can have
+ * several of the same kind — separate Anthropic keys, several OpenAI-compatible
+ * endpoints — each with its own credentials and model selection.
+ *
+ * API keys are write-only: they go in, get encrypted, and never come back out.
+ * Every response carries a masked hint instead.
  */
 import {
-	DEFAULT_MODEL,
-	DEFAULT_PROVIDER,
+	decryptSecret,
 	encryptSecret,
-	getProvider,
-	isProviderId,
+	getKind,
+	isProviderKind,
+	listModels,
 	maskSecret,
-	PROVIDERS,
-	resolveCredentials,
+	PROVIDER_KINDS,
 } from "@boilerslate/ai";
 import { db } from "@boilerslate/db";
-import { aiProviderConfig, aiSettings } from "@boilerslate/db/schema/ai";
+import { aiProvider, aiSettings } from "@boilerslate/db/schema/ai";
 import { ORPCError } from "@orpc/server";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { organizationProcedure } from "../index";
 
-const providerIdSchema = z.string().refine(isProviderId, {
-	message: "Unknown provider.",
+/** Columns safe to return. Never includes apiKeyEncrypted. */
+const publicColumns = {
+	id: aiProvider.id,
+	name: aiProvider.name,
+	kind: aiProvider.kind,
+	apiKeyHint: aiProvider.apiKeyHint,
+	baseUrl: aiProvider.baseUrl,
+	enabledModels: aiProvider.enabledModels,
+	availableModels: aiProvider.availableModels,
+	lastCheckedAt: aiProvider.lastCheckedAt,
+	lastError: aiProvider.lastError,
+};
+
+const kindSchema = z.string().refine(isProviderKind, {
+	message: "Unknown provider kind.",
 });
 
-export const aiRouter = {
-	/** The catalog plus, per provider, whether it is usable and how. */
-	listProviders: organizationProcedure.handler(async ({ context }) => {
-		const rows = await db
-			.select({
-				provider: aiProviderConfig.provider,
-				apiKeyHint: aiProviderConfig.apiKeyHint,
-				baseUrl: aiProviderConfig.baseUrl,
-				defaultModel: aiProviderConfig.defaultModel,
-				// apiKeyEncrypted is deliberately not selected.
-			})
-			.from(aiProviderConfig)
-			.where(eq(aiProviderConfig.organizationId, context.organizationId));
+/** Loads a provider owned by the caller's organization, or 404s. */
+async function requireProvider(providerId: string, organizationId: string) {
+	const [row] = await db
+		.select()
+		.from(aiProvider)
+		.where(
+			and(
+				eq(aiProvider.id, providerId),
+				eq(aiProvider.organizationId, organizationId),
+			),
+		)
+		.limit(1);
 
-		const stored = new Map(rows.map((r) => [r.provider, r]));
+	if (!row) {
+		// Same response whether it does not exist or belongs to someone else —
+		// a distinguishable 403 would confirm the id is real.
+		throw new ORPCError("NOT_FOUND", { message: "Provider not found." });
+	}
+	return row;
+}
 
-		return PROVIDERS.map((info) => {
-			const row = stored.get(info.id);
-			const hasStoredKey = Boolean(row?.apiKeyHint);
-			// resolveCredentials also consults the server env fallback.
-			const usable = Boolean(
-				resolveCredentials(
-					info.id,
-					hasStoredKey
-						? { apiKey: "stored", baseUrl: row?.baseUrl ?? undefined }
-						: null,
-				),
-			);
-
-			return {
-				id: info.id,
-				label: info.label,
-				docs: info.docs,
-				requiresBaseUrl: info.requiresBaseUrl ?? false,
-				envKey: info.envKey,
-				models: info.models,
-				configured: usable,
-				source: hasStoredKey
-					? ("stored" as const)
-					: usable
-						? ("env" as const)
-						: ("none" as const),
-				apiKeyHint: row?.apiKeyHint ?? null,
-				baseUrl: row?.baseUrl ?? null,
-				defaultModel: row?.defaultModel ?? null,
-			};
+/** Decrypts the stored key, or throws a readable error. */
+function credentialsFor(row: typeof aiProvider.$inferSelect) {
+	if (!row.apiKeyEncrypted) {
+		throw new ORPCError("PRECONDITION_FAILED", {
+			message: "This provider has no API key yet.",
 		});
-	}),
+	}
+	try {
+		return {
+			apiKey: decryptSecret(row.apiKeyEncrypted),
+			baseUrl: row.baseUrl ?? undefined,
+		};
+	} catch {
+		throw new ORPCError("PRECONDITION_FAILED", {
+			message:
+				"The stored key could not be decrypted. ENCRYPTION_KEY may have changed — re-enter the key.",
+		});
+	}
+}
 
-	/** Store or replace a provider credential. The key never comes back out. */
-	saveProvider: organizationProcedure
+export const aiRouter = {
+	/** The base kinds a provider can be built on. */
+	listKinds: organizationProcedure.handler(() =>
+		PROVIDER_KINDS.map((k) => ({
+			id: k.id,
+			label: k.label,
+			example: k.example,
+			requiresBaseUrl: k.requiresBaseUrl,
+			defaultBaseUrl: k.defaultBaseUrl ?? null,
+			docs: k.docs,
+			hint: k.hint,
+		})),
+	),
+
+	/** Every configured provider for this organization. Never returns keys. */
+	listProviders: organizationProcedure.handler(async ({ context }) =>
+		db
+			.select(publicColumns)
+			.from(aiProvider)
+			.where(eq(aiProvider.organizationId, context.organizationId))
+			.orderBy(asc(aiProvider.name)),
+	),
+
+	createProvider: organizationProcedure
 		.input(
 			z.object({
-				provider: providerIdSchema,
-				/** Omit to keep the existing key and only change other fields. */
-				apiKey: z.string().min(1).optional(),
+				name: z.string().min(1).max(64),
+				kind: kindSchema,
+				apiKey: z.string().min(1),
 				baseUrl: z.url().optional().or(z.literal("")),
-				defaultModel: z.string().optional(),
 			}),
 		)
 		.handler(async ({ input, context }) => {
-			const info = getProvider(input.provider);
-			if (!info) throw new ORPCError("BAD_REQUEST");
+			const kind = getKind(input.kind);
+			if (!kind) throw new ORPCError("BAD_REQUEST");
 
-			if (info.requiresBaseUrl && !input.baseUrl) {
+			if (kind.requiresBaseUrl && !input.baseUrl) {
 				throw new ORPCError("BAD_REQUEST", {
-					message: `${info.label} needs a base URL.`,
+					message: `${kind.label} needs a base URL.`,
 				});
 			}
 
-			let encrypted: string | undefined;
-			let hint: string | undefined;
+			let encrypted: string;
+			try {
+				encrypted = encryptSecret(input.apiKey);
+			} catch (error) {
+				throw new ORPCError("PRECONDITION_FAILED", {
+					message:
+						error instanceof Error ? error.message : "Cannot encrypt secret.",
+				});
+			}
+
+			const id = crypto.randomUUID();
+			try {
+				await db.insert(aiProvider).values({
+					id,
+					organizationId: context.organizationId,
+					name: input.name.trim(),
+					kind: input.kind,
+					apiKeyEncrypted: encrypted,
+					apiKeyHint: maskSecret(input.apiKey),
+					baseUrl: input.baseUrl || kind.defaultBaseUrl || null,
+					// null means "every model this provider reports".
+					enabledModels: null,
+				});
+			} catch {
+				throw new ORPCError("CONFLICT", {
+					message: "A provider with that name already exists.",
+				});
+			}
+
+			return { id };
+		}),
+
+	updateProvider: organizationProcedure
+		.input(
+			z.object({
+				providerId: z.string().min(1),
+				name: z.string().min(1).max(64).optional(),
+				/** Omit to keep the existing key. */
+				apiKey: z.string().min(1).optional(),
+				baseUrl: z.url().optional().or(z.literal("")),
+			}),
+		)
+		.handler(async ({ input, context }) => {
+			const existing = await requireProvider(
+				input.providerId,
+				context.organizationId,
+			);
+
+			const patch: Record<string, unknown> = {};
+			if (input.name) patch.name = input.name.trim();
+			if (input.baseUrl !== undefined) patch.baseUrl = input.baseUrl || null;
 			if (input.apiKey) {
 				try {
-					encrypted = encryptSecret(input.apiKey);
+					patch.apiKeyEncrypted = encryptSecret(input.apiKey);
 				} catch (error) {
-					// Thrown when ENCRYPTION_KEY is missing or too short. Surface
-					// it as a real message rather than a generic 500.
 					throw new ORPCError("PRECONDITION_FAILED", {
 						message:
 							error instanceof Error ? error.message : "Cannot encrypt secret.",
 					});
 				}
-				hint = maskSecret(input.apiKey);
+				patch.apiKeyHint = maskSecret(input.apiKey);
+				// Credentials changed, so the cached check no longer means anything.
+				patch.lastCheckedAt = null;
+				patch.lastError = null;
 			}
 
-			const values = {
-				organizationId: context.organizationId,
-				provider: input.provider,
-				baseUrl: input.baseUrl || null,
-				defaultModel: input.defaultModel ?? null,
-				...(encrypted ? { apiKeyEncrypted: encrypted, apiKeyHint: hint } : {}),
-			};
+			if (Object.keys(patch).length === 0) return { ok: true };
 
 			await db
-				.insert(aiProviderConfig)
-				.values({ id: crypto.randomUUID(), ...values })
-				.onConflictDoUpdate({
-					target: [aiProviderConfig.organizationId, aiProviderConfig.provider],
-					set: values,
-				});
+				.update(aiProvider)
+				.set(patch)
+				.where(eq(aiProvider.id, existing.id));
 
 			return { ok: true };
 		}),
 
-	/** Forget a stored credential. The env fallback, if any, still applies. */
-	removeProvider: organizationProcedure
-		.input(z.object({ provider: providerIdSchema }))
+	deleteProvider: organizationProcedure
+		.input(z.object({ providerId: z.string().min(1) }))
 		.handler(async ({ input, context }) => {
-			await db
-				.delete(aiProviderConfig)
-				.where(
-					and(
-						eq(aiProviderConfig.organizationId, context.organizationId),
-						eq(aiProviderConfig.provider, input.provider),
-					),
-				);
+			const existing = await requireProvider(
+				input.providerId,
+				context.organizationId,
+			);
+			await db.delete(aiProvider).where(eq(aiProvider.id, existing.id));
 			return { ok: true };
 		}),
 
-	/** The organization's active provider, model and system prompt. */
+	/**
+	 * Calls the provider's models endpoint. Doubles as the connection test —
+	 * listing models is exactly the proof that the credential works.
+	 */
+	testConnection: organizationProcedure
+		.input(z.object({ providerId: z.string().min(1) }))
+		.handler(async ({ input, context }) => {
+			const row = await requireProvider(
+				input.providerId,
+				context.organizationId,
+			);
+			if (!isProviderKind(row.kind)) {
+				throw new ORPCError("BAD_REQUEST", { message: "Unknown kind." });
+			}
+
+			const result = await listModels(row.kind, credentialsFor(row));
+
+			await db
+				.update(aiProvider)
+				.set({
+					lastCheckedAt: new Date(),
+					lastError: result.ok ? null : (result.error ?? "Unknown error"),
+					...(result.ok
+						? {
+								availableModels: result.models.map((m) => ({
+									id: m.id,
+									label: m.label,
+								})),
+							}
+						: {}),
+				})
+				.where(eq(aiProvider.id, row.id));
+
+			return {
+				ok: result.ok,
+				error: result.error ?? null,
+				models: result.models.map((m) => ({ id: m.id, label: m.label })),
+			};
+		}),
+
+	/** `models: null` means "all models this provider reports". */
+	setEnabledModels: organizationProcedure
+		.input(
+			z.object({
+				providerId: z.string().min(1),
+				models: z.array(z.string().min(1)).nullable(),
+			}),
+		)
+		.handler(async ({ input, context }) => {
+			const row = await requireProvider(
+				input.providerId,
+				context.organizationId,
+			);
+			await db
+				.update(aiProvider)
+				.set({ enabledModels: input.models })
+				.where(eq(aiProvider.id, row.id));
+			return { ok: true };
+		}),
+
 	getSettings: organizationProcedure.handler(async ({ context }) => {
 		const [row] = await db
 			.select()
@@ -155,28 +279,43 @@ export const aiRouter = {
 			.limit(1);
 
 		return {
-			activeProvider: row?.activeProvider ?? DEFAULT_PROVIDER,
-			activeModel: row?.activeModel ?? DEFAULT_MODEL,
+			activeProviderId: row?.activeProviderId ?? null,
+			activeModel: row?.activeModel ?? null,
 			systemPrompt: row?.systemPrompt ?? "",
 		};
 	}),
 
-	saveSettings: organizationProcedure
+	setActive: organizationProcedure
 		.input(
 			z.object({
-				activeProvider: providerIdSchema,
-				activeModel: z.string().min(1),
+				providerId: z.string().min(1).nullable(),
+				model: z.string().min(1).nullable(),
 				systemPrompt: z.string().max(8000).optional(),
 			}),
 		)
 		.handler(async ({ input, context }) => {
-			const info = getProvider(input.activeProvider);
-			if (!info) throw new ORPCError("BAD_REQUEST");
+			if (input.providerId) {
+				const row = await requireProvider(
+					input.providerId,
+					context.organizationId,
+				);
+				// Refuse a model the provider is not offering, so the chat endpoint
+				// cannot be pointed at something that will only fail at call time.
+				if (input.model) {
+					const allowed =
+						row.enabledModels ?? (row.availableModels ?? []).map((m) => m.id);
+					if (allowed.length > 0 && !allowed.includes(input.model)) {
+						throw new ORPCError("BAD_REQUEST", {
+							message: `${input.model} is not enabled on that provider.`,
+						});
+					}
+				}
+			}
 
 			const values = {
 				organizationId: context.organizationId,
-				activeProvider: input.activeProvider,
-				activeModel: input.activeModel,
+				activeProviderId: input.providerId,
+				activeModel: input.model,
 				systemPrompt: input.systemPrompt ?? null,
 			};
 

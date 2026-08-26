@@ -12,19 +12,9 @@ export const env = createEnv({
 			.enum(["development", "production", "test"])
 			.default("development"),
 
-		// Master key for provider credentials stored per organization.
-		// Required only if you store keys through the settings UI; env-var-only
-		// deployments can leave it unset.
+		// Master key for the AI provider credentials stored per organization.
+		// Required to configure any AI provider; unused otherwise.
 		ENCRYPTION_KEY: z.string().min(32).optional(),
-
-		// Fallback provider credentials. Used when an organization has not
-		// stored its own key, which is the normal case for single-tenant
-		// deployments.
-		ANTHROPIC_API_KEY: z.string().optional(),
-		OPENAI_API_KEY: z.string().optional(),
-		GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),
-		COMPATIBLE_API_KEY: z.string().optional(),
-		COMPATIBLE_API_KEY_BASE_URL: z.url().optional(),
 	},
 	runtimeEnv: process.env,
 	skipValidation: !!process.env.SKIP_ENV_VALIDATION,

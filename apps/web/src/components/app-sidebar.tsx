@@ -32,12 +32,14 @@ import {
 	LogOut,
 	Palette,
 	Settings,
-	Squircle,
+	Users,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { OrganizationSwitcher } from "./organization-switcher";
 
 const NAV_ITEMS = [
 	{ to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+	{ to: "/organization", label: "Organization", icon: Users },
 	{ to: "/playground", label: "Playground", icon: Palette },
 	{ to: "/settings", label: "Settings", icon: Settings },
 ] as const;
@@ -62,21 +64,7 @@ export function AppSidebar() {
 	return (
 		<Sidebar collapsible="icon">
 			<SidebarHeader>
-				<SidebarMenu>
-					<SidebarMenuItem>
-						<SidebarMenuButton size="lg" render={<Link to="/dashboard" />}>
-							<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-								<Squircle className="size-4" />
-							</div>
-							<div className="grid flex-1 text-left leading-tight">
-								<span className="truncate font-semibold">Boilerslate</span>
-								<span className="truncate text-muted-foreground text-xs">
-									Starter workspace
-								</span>
-							</div>
-						</SidebarMenuButton>
-					</SidebarMenuItem>
-				</SidebarMenu>
+				<OrganizationSwitcher />
 			</SidebarHeader>
 
 			<SidebarContent>

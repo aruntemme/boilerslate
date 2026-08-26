@@ -59,7 +59,39 @@ a 403. The pattern is in `apps/server/src/index.test.ts` under
 second user sees nothing and is refused even when naming the organization id
 directly.
 
-## What is not built yet
+## The UI
 
-There is no organization UI — no create form, no member list, no invite flow,
-no tenant switcher. The API works and is tested; the screens are not written.
+| Where | What |
+| --- | --- |
+| Sidebar header | Organization switcher — list, switch, create |
+| `/organization` | Profile (owner only), members with role management, invitations |
+| `/accept-invitation/$invitationId` | Public accept/decline page |
+
+Switching sets the active organization **on the session**, server-side, so it
+changes what every organization-scoped procedure can see. The switcher
+invalidates queries and the router afterwards for that reason.
+
+The management page hides actions the current member cannot perform, but that
+is a courtesy — Better Auth enforces permissions on the server, and the tests
+in `apps/server/src/index.test.ts` prove it: a plain member cannot invite,
+cannot remove anyone, and cannot promote themselves to owner.
+
+## Invitations without email
+
+There is no email sending yet, so an invitation is not delivered — the UI shows
+the accept link and a copy button instead, and every pending invitation has a
+"Link" action to recover it.
+
+The link is `/accept-invitation/<invitationId>`. The invited person must sign in
+with the address the invitation was sent to; the server refuses otherwise
+("You are not the recipient of the invitation").
+
+Wire up an email provider and Better Auth will send these itself — see
+`sendInvitationEmail` in the organization plugin options.
+
+## Still missing
+
+- Email delivery for invitations
+- Custom roles beyond `owner` / `admin` / `member`
+- Teams (sub-groups within an organization); the plugin supports them, the UI
+  does not

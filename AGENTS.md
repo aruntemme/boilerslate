@@ -89,7 +89,9 @@ bunx @better-auth/cli generate --config ./src/index.ts --output ../db/src/schema
 Then check the diff. That CLI has removed still-required columns before
 (`account.issuer`), so read what it produced instead of trusting it.
 
-**Multi-tenancy.** Users belong to organizations via the `member` table with a
+**Multi-tenancy.** The UI is the switcher in the sidebar header,
+`/organization`, and the public `/accept-invitation/$invitationId` route.
+Users belong to organizations via the `member` table with a
 role (`owner`/`admin`/`member`). Any query returning tenant data must be scoped
 by the caller's organization — Better Auth's endpoints do this for you, but
 your own oRPC procedures do not. Scope them yourself, and add a test proving a

@@ -370,3 +370,214 @@ describe("ai chat endpoint", () => {
 		expect(res.status).toBe(403);
 	});
 });
+
+describe("organization permissions", () => {
+	/** Creates an org, makes it active, and returns the owner's cookie. */
+	async function ownerWithOrg(prefix: string) {
+		const { cookie, email } = await signUp(prefix);
+		const slug = `org-${crypto.randomUUID().slice(0, 8)}`;
+		const created = await call("/api/auth/organization/create", {
+			method: "POST",
+			body: JSON.stringify({ name: `${prefix} Org`, slug }),
+			cookie,
+		});
+		expect(created.status).toBe(200);
+		await call("/api/auth/organization/set-active", {
+			method: "POST",
+			body: JSON.stringify({ organizationId: created.body.id }),
+			cookie,
+		});
+		return { cookie, email, organizationId: created.body.id as string };
+	}
+
+	/** Invites someone, accepts as them, and returns their cookie. */
+	async function addMember(
+		ownerCookie: string,
+		organizationId: string,
+		role: "admin" | "member",
+	) {
+		const invitee = await signUp(`invitee-${role}`);
+
+		const invited = await call("/api/auth/organization/invite-member", {
+			method: "POST",
+			body: JSON.stringify({ email: invitee.email, role }),
+			cookie: ownerCookie,
+		});
+		expect(invited.status).toBe(200);
+
+		const accepted = await call("/api/auth/organization/accept-invitation", {
+			method: "POST",
+			body: JSON.stringify({ invitationId: invited.body.id }),
+			cookie: invitee.cookie,
+		});
+		expect(accepted.status).toBe(200);
+
+		await call("/api/auth/organization/set-active", {
+			method: "POST",
+			body: JSON.stringify({ organizationId }),
+			cookie: invitee.cookie,
+		});
+
+		return invitee;
+	}
+
+	test("an invited member can join and see the organization", async () => {
+		const owner = await ownerWithOrg("perm-join");
+		const member = await addMember(
+			owner.cookie,
+			owner.organizationId,
+			"member",
+		);
+
+		const list = await call("/api/auth/organization/list", {
+			cookie: member.cookie,
+		});
+		expect(list.status).toBe(200);
+		expect(list.body.map((o: Json) => o.id)).toContain(owner.organizationId);
+	});
+
+	test("a plain member cannot invite others", async () => {
+		const owner = await ownerWithOrg("perm-invite");
+		const member = await addMember(
+			owner.cookie,
+			owner.organizationId,
+			"member",
+		);
+
+		const res = await call("/api/auth/organization/invite-member", {
+			method: "POST",
+			body: JSON.stringify({ email: "outsider@example.test", role: "member" }),
+			cookie: member.cookie,
+		});
+		expect(res.status).toBeGreaterThanOrEqual(400);
+	});
+
+	test("an admin can invite", async () => {
+		const owner = await ownerWithOrg("perm-admin-invite");
+		const admin = await addMember(owner.cookie, owner.organizationId, "admin");
+
+		const res = await call("/api/auth/organization/invite-member", {
+			method: "POST",
+			body: JSON.stringify({
+				email: `admin-invited-${crypto.randomUUID()}@example.test`,
+				role: "member",
+			}),
+			cookie: admin.cookie,
+		});
+		expect(res.status).toBe(200);
+	});
+
+	test("a plain member cannot remove anyone", async () => {
+		const owner = await ownerWithOrg("perm-remove");
+		const member = await addMember(
+			owner.cookie,
+			owner.organizationId,
+			"member",
+		);
+		const victim = await addMember(
+			owner.cookie,
+			owner.organizationId,
+			"member",
+		);
+
+		const full = await call("/api/auth/organization/get-full-organization", {
+			cookie: owner.cookie,
+		});
+		const victimMember = full.body.members.find(
+			(m: Json) => m.user?.email === victim.email,
+		);
+		expect(victimMember).toBeTruthy();
+
+		const res = await call("/api/auth/organization/remove-member", {
+			method: "POST",
+			body: JSON.stringify({ memberIdOrEmail: victimMember.id }),
+			cookie: member.cookie,
+		});
+		expect(res.status).toBeGreaterThanOrEqual(400);
+	});
+
+	test("a plain member cannot promote themselves", async () => {
+		const owner = await ownerWithOrg("perm-escalate");
+		const member = await addMember(
+			owner.cookie,
+			owner.organizationId,
+			"member",
+		);
+
+		const full = await call("/api/auth/organization/get-full-organization", {
+			cookie: owner.cookie,
+		});
+		const self = full.body.members.find(
+			(m: Json) => m.user?.email === member.email,
+		);
+
+		const res = await call("/api/auth/organization/update-member-role", {
+			method: "POST",
+			body: JSON.stringify({ memberId: self.id, role: "owner" }),
+			cookie: member.cookie,
+		});
+		expect(res.status).toBeGreaterThanOrEqual(400);
+	});
+
+	test("an owner can change a member's role", async () => {
+		const owner = await ownerWithOrg("perm-promote");
+		const member = await addMember(
+			owner.cookie,
+			owner.organizationId,
+			"member",
+		);
+
+		const full = await call("/api/auth/organization/get-full-organization", {
+			cookie: owner.cookie,
+		});
+		const target = full.body.members.find(
+			(m: Json) => m.user?.email === member.email,
+		);
+
+		const res = await call("/api/auth/organization/update-member-role", {
+			method: "POST",
+			body: JSON.stringify({ memberId: target.id, role: "admin" }),
+			cookie: owner.cookie,
+		});
+		expect(res.status).toBe(200);
+	});
+
+	test("a non-member cannot invite into an organization", async () => {
+		const owner = await ownerWithOrg("perm-outsider");
+		const outsider = await signUp("perm-outsider-user");
+
+		const res = await call("/api/auth/organization/invite-member", {
+			method: "POST",
+			body: JSON.stringify({
+				email: "nope@example.test",
+				role: "member",
+				organizationId: owner.organizationId,
+			}),
+			cookie: outsider.cookie,
+		});
+		expect(res.status).toBeGreaterThanOrEqual(400);
+	});
+
+	test("leaving removes access to the organization", async () => {
+		const owner = await ownerWithOrg("perm-leave");
+		const member = await addMember(
+			owner.cookie,
+			owner.organizationId,
+			"member",
+		);
+
+		const left = await call("/api/auth/organization/leave", {
+			method: "POST",
+			body: JSON.stringify({ organizationId: owner.organizationId }),
+			cookie: member.cookie,
+		});
+		expect(left.status).toBe(200);
+
+		const list = await call("/api/auth/organization/list", {
+			cookie: member.cookie,
+		});
+		expect(list.body.map((o: Json) => o.id)).not.toContain(
+			owner.organizationId,
+		);
+	});
+});

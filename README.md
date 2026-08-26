@@ -31,8 +31,9 @@ generation step and no DTO layer.
 ## What you get
 
 **Auth and multi-tenancy.** Email/password sign-in, sessions in Postgres, and
-organizations with `owner` / `admin` / `member` roles and invitations. Tenant
-isolation is covered by tests: a non-member gets a 403 even when naming an
+organizations with `owner` / `admin` / `member` roles and invitations, with a
+switcher and a management page. Tenant isolation and role enforcement are
+covered by tests: a non-member gets a 403 even when naming an
 organization id directly.
 
 **A design system with eight themes.** Emerald, violet, blue, cyan, rose,
@@ -49,8 +50,9 @@ reasoning traces, tool-call chips, live task status, human-in-the-loop
 approval, retrieved-context cards, a code/diff viewer, a prompt composer with
 `@` sources and `/` commands, and a chat transcript.
 
-**Three pages to build from.** `/dashboard` (charts and stats), `/settings`
-(theme editing) and `/playground` — every component live on one screen, so a
+**Four pages to build from.** `/dashboard` (charts and stats), `/organization`
+(members, roles, invitations), `/settings` (themes and AI providers) and
+`/playground` — every component live on one screen, so a
 design change can be checked against the whole library at once.
 
 ## Verification
@@ -116,9 +118,9 @@ highest-leverage file in the repo; keep it current.
 
 ## Known gaps
 
-- No organization UI — the API works and is tested, the screens are not written
+- No email sending, so invitations are shared as links rather than delivered
 - No payments; Better Auth integrates with Polar in one flag when you want it
-- No email sending, so invitations cannot be delivered yet
+- No teams UI (the organization plugin supports them; the screens are not written)
 
 ## License
 

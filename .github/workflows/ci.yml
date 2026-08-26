@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Lets you re-run the suite from the Actions tab without pushing.
+  workflow_dispatch:
 
 jobs:
   verify:

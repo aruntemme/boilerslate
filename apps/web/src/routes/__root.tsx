@@ -1,4 +1,5 @@
 import { Toaster } from "@boilerslate/ui/components/sonner";
+import { THEME_INIT_SCRIPT } from "@boilerslate/ui/lib/themes";
 import type { QueryClient } from "@tanstack/react-query";
 
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
@@ -11,7 +12,7 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import type { orpc } from "@/utils/orpc";
-import Header from "../components/header";
+import { ThemeProvider } from "../components/theme-provider";
 import appCss from "../index.css?url";
 export interface RouterAppContext {
 	orpc: typeof orpc;
@@ -45,17 +46,23 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 
 function RootDocument() {
 	return (
-		<html lang="en" className="dark">
+		// data-theme and the dark class are set by THEME_INIT_SCRIPT before
+		// first paint, then owned by <ThemeProvider> once React hydrates.
+		// suppressHydrationWarning: the script mutates these attributes, so the
+		// server markup and the hydrated DOM legitimately differ here.
+		<html lang="en" suppressHydrationWarning>
 			<head>
 				<HeadContent />
+				<script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
 			</head>
 			<body>
-				<div className="grid h-svh grid-rows-[auto_1fr]">
-					<Header />
+				<ThemeProvider>
 					<Outlet />
-				</div>
+				</ThemeProvider>
 				<Toaster richColors />
-				<TanStackRouterDevtools position="bottom-left" />
+				{/* Both devtools sit bottom-right: bottom-left would cover the
+					    sidebar's user menu and make it unclickable in development. */}
+				<TanStackRouterDevtools position="bottom-right" />
 				<ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
 				<Scripts />
 			</body>

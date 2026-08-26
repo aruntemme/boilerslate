@@ -1,0 +1,231 @@
+/*
+ * THEMES — the design system.
+ *
+ * Two independent axes:
+ *   theme  ->  data-theme="<id>" on <html>   (which colour family)
+ *   mode   ->  .dark class on <html>          (light or dark)
+ *
+ * So <html class="dark" data-theme="violet"> is violet-dark.
+ *
+ * Selectors are written `:root[data-theme="x"]` (specificity 0,2,0) so they
+ * beat the neutral defaults in globals.css (`:root`, 0,1,0) regardless of
+ * import order. Dark adds `.dark` on top (0,3,0).
+ *
+ * Each theme overrides only what actually changes: the brand colour, its
+ * sidebar counterpart, and the chart ramp. Backgrounds, borders and muted
+ * greys stay shared, which is what keeps the themes feeling like one system
+ * rather than eight unrelated skins.
+ *
+ * To add a theme: copy a block, change the values, then register its id and
+ * label in packages/ui/src/lib/themes.ts. Nothing else needs to know.
+ */
+
+/* ---------------------------------------------------------------- emerald */
+
+:root[data-theme="emerald"] {
+	--primary: oklch(0.508 0.118 165.612);
+	--primary-foreground: oklch(0.979 0.021 166.113);
+	--sidebar-primary: oklch(0.596 0.145 163.225);
+	--sidebar-primary-foreground: oklch(0.979 0.021 166.113);
+	--chart-1: oklch(0.796 0.106 165.612);
+	--chart-2: oklch(0.696 0.132 165.612);
+	--chart-3: oklch(0.596 0.145 165.612);
+	--chart-4: oklch(0.508 0.118 165.612);
+	--chart-5: oklch(0.412 0.094 165.612);
+}
+
+:root[data-theme="emerald"].dark {
+	--primary: oklch(0.432 0.095 166.913);
+	--primary-foreground: oklch(0.979 0.021 166.113);
+	--sidebar-primary: oklch(0.696 0.17 162.48);
+	--sidebar-primary-foreground: oklch(0.262 0.051 172.552);
+	--chart-1: oklch(0.796 0.106 165.612);
+	--chart-2: oklch(0.696 0.132 165.612);
+	--chart-3: oklch(0.596 0.145 165.612);
+	--chart-4: oklch(0.508 0.118 165.612);
+	--chart-5: oklch(0.412 0.094 165.612);
+}
+
+/* ----------------------------------------------------------------- violet */
+
+:root[data-theme="violet"] {
+	--primary: oklch(0.457 0.24 277.023);
+	--primary-foreground: oklch(0.962 0.018 272.314);
+	--sidebar-primary: oklch(0.511 0.262 276.966);
+	--sidebar-primary-foreground: oklch(0.962 0.018 272.314);
+	--chart-1: oklch(0.809 0.105 277.023);
+	--chart-2: oklch(0.683 0.174 277.023);
+	--chart-3: oklch(0.586 0.225 277.023);
+	--chart-4: oklch(0.457 0.24 277.023);
+	--chart-5: oklch(0.379 0.186 277.023);
+}
+
+:root[data-theme="violet"].dark {
+	--primary: oklch(0.398 0.195 277.366);
+	--primary-foreground: oklch(0.962 0.018 272.314);
+	--sidebar-primary: oklch(0.585 0.233 277.117);
+	--sidebar-primary-foreground: oklch(0.962 0.018 272.314);
+	--chart-1: oklch(0.809 0.105 277.023);
+	--chart-2: oklch(0.683 0.174 277.023);
+	--chart-3: oklch(0.586 0.225 277.023);
+	--chart-4: oklch(0.457 0.24 277.023);
+	--chart-5: oklch(0.379 0.186 277.023);
+}
+
+/* ---------------------------------------------------------------- neutral */
+/* The achromatic default: no brand colour at all. Useful as a starting point
+   before a project has an identity, and for screenshots and documentation. */
+
+:root[data-theme="neutral"] {
+	--primary: oklch(0.205 0 0);
+	--primary-foreground: oklch(0.985 0 0);
+	--sidebar-primary: oklch(0.205 0 0);
+	--sidebar-primary-foreground: oklch(0.985 0 0);
+	--chart-1: oklch(0.87 0 0);
+	--chart-2: oklch(0.556 0 0);
+	--chart-3: oklch(0.439 0 0);
+	--chart-4: oklch(0.371 0 0);
+	--chart-5: oklch(0.269 0 0);
+}
+
+:root[data-theme="neutral"].dark {
+	--primary: oklch(0.87 0 0);
+	--primary-foreground: oklch(0.205 0 0);
+	--sidebar-primary: oklch(0.87 0 0);
+	--sidebar-primary-foreground: oklch(0.205 0 0);
+	--chart-1: oklch(0.87 0 0);
+	--chart-2: oklch(0.556 0 0);
+	--chart-3: oklch(0.439 0 0);
+	--chart-4: oklch(0.371 0 0);
+	--chart-5: oklch(0.269 0 0);
+}
+
+/* ------------------------------------------------------------------- blue */
+
+:root[data-theme="blue"] {
+	--primary: oklch(0.546 0.245 262.881);
+	--primary-foreground: oklch(0.97 0.014 254.604);
+	--sidebar-primary: oklch(0.623 0.214 259.815);
+	--sidebar-primary-foreground: oklch(0.97 0.014 254.604);
+	--chart-1: oklch(0.809 0.105 251.813);
+	--chart-2: oklch(0.623 0.214 259.815);
+	--chart-3: oklch(0.546 0.245 262.881);
+	--chart-4: oklch(0.488 0.243 264.376);
+	--chart-5: oklch(0.424 0.199 265.638);
+}
+
+:root[data-theme="blue"].dark {
+	--primary: oklch(0.488 0.243 264.376);
+	--primary-foreground: oklch(0.97 0.014 254.604);
+	--sidebar-primary: oklch(0.707 0.165 254.624);
+	--sidebar-primary-foreground: oklch(0.257 0.09 281.288);
+	--chart-1: oklch(0.809 0.105 251.813);
+	--chart-2: oklch(0.623 0.214 259.815);
+	--chart-3: oklch(0.546 0.245 262.881);
+	--chart-4: oklch(0.488 0.243 264.376);
+	--chart-5: oklch(0.424 0.199 265.638);
+}
+
+/* ------------------------------------------------------------------- rose */
+
+:root[data-theme="rose"] {
+	--primary: oklch(0.514 0.222 16.935);
+	--primary-foreground: oklch(0.969 0.015 12.422);
+	--sidebar-primary: oklch(0.586 0.222 17.585);
+	--sidebar-primary-foreground: oklch(0.969 0.015 12.422);
+	--chart-1: oklch(0.81 0.093 16.935);
+	--chart-2: oklch(0.712 0.155 16.935);
+	--chart-3: oklch(0.586 0.222 17.585);
+	--chart-4: oklch(0.514 0.222 16.935);
+	--chart-5: oklch(0.41 0.176 16.935);
+}
+
+:root[data-theme="rose"].dark {
+	--primary: oklch(0.455 0.188 16.935);
+	--primary-foreground: oklch(0.969 0.015 12.422);
+	--sidebar-primary: oklch(0.645 0.207 16.439);
+	--sidebar-primary-foreground: oklch(0.259 0.077 19.02);
+	--chart-1: oklch(0.81 0.093 16.935);
+	--chart-2: oklch(0.712 0.155 16.935);
+	--chart-3: oklch(0.586 0.222 17.585);
+	--chart-4: oklch(0.514 0.222 16.935);
+	--chart-5: oklch(0.41 0.176 16.935);
+}
+
+/* ------------------------------------------------------------------ amber */
+
+:root[data-theme="amber"] {
+	--primary: oklch(0.555 0.128 66.663);
+	--primary-foreground: oklch(0.973 0.031 84.594);
+	--sidebar-primary: oklch(0.666 0.155 62.303);
+	--sidebar-primary-foreground: oklch(0.973 0.031 84.594);
+	--chart-1: oklch(0.828 0.106 66.663);
+	--chart-2: oklch(0.729 0.146 66.663);
+	--chart-3: oklch(0.666 0.155 62.303);
+	--chart-4: oklch(0.555 0.128 66.663);
+	--chart-5: oklch(0.442 0.101 66.663);
+}
+
+:root[data-theme="amber"].dark {
+	--primary: oklch(0.473 0.109 66.663);
+	--primary-foreground: oklch(0.973 0.031 84.594);
+	--sidebar-primary: oklch(0.769 0.153 70.677);
+	--sidebar-primary-foreground: oklch(0.279 0.062 66.663);
+	--chart-1: oklch(0.828 0.106 66.663);
+	--chart-2: oklch(0.729 0.146 66.663);
+	--chart-3: oklch(0.666 0.155 62.303);
+	--chart-4: oklch(0.555 0.128 66.663);
+	--chart-5: oklch(0.442 0.101 66.663);
+}
+
+/* ------------------------------------------------------------------- cyan */
+
+:root[data-theme="cyan"] {
+	--primary: oklch(0.52 0.105 220.5);
+	--primary-foreground: oklch(0.973 0.021 213.6);
+	--sidebar-primary: oklch(0.609 0.126 221.723);
+	--sidebar-primary-foreground: oklch(0.973 0.021 213.6);
+	--chart-1: oklch(0.805 0.083 220.5);
+	--chart-2: oklch(0.705 0.107 220.5);
+	--chart-3: oklch(0.609 0.126 221.723);
+	--chart-4: oklch(0.52 0.105 220.5);
+	--chart-5: oklch(0.423 0.084 220.5);
+}
+
+:root[data-theme="cyan"].dark {
+	--primary: oklch(0.443 0.089 220.5);
+	--primary-foreground: oklch(0.973 0.021 213.6);
+	--sidebar-primary: oklch(0.715 0.128 215.221);
+	--sidebar-primary-foreground: oklch(0.267 0.048 220.5);
+	--chart-1: oklch(0.805 0.083 220.5);
+	--chart-2: oklch(0.705 0.107 220.5);
+	--chart-3: oklch(0.609 0.126 221.723);
+	--chart-4: oklch(0.52 0.105 220.5);
+	--chart-5: oklch(0.423 0.084 220.5);
+}
+
+/* ----------------------------------------------------------------- orange */
+
+:root[data-theme="orange"] {
+	--primary: oklch(0.553 0.195 38.402);
+	--primary-foreground: oklch(0.98 0.016 73.684);
+	--sidebar-primary: oklch(0.646 0.222 41.116);
+	--sidebar-primary-foreground: oklch(0.98 0.016 73.684);
+	--chart-1: oklch(0.837 0.104 38.402);
+	--chart-2: oklch(0.741 0.153 38.402);
+	--chart-3: oklch(0.646 0.222 41.116);
+	--chart-4: oklch(0.553 0.195 38.402);
+	--chart-5: oklch(0.447 0.157 38.402);
+}
+
+:root[data-theme="orange"].dark {
+	--primary: oklch(0.47 0.166 38.402);
+	--primary-foreground: oklch(0.98 0.016 73.684);
+	--sidebar-primary: oklch(0.705 0.191 41.116);
+	--sidebar-primary-foreground: oklch(0.266 0.079 36.259);
+	--chart-1: oklch(0.837 0.104 38.402);
+	--chart-2: oklch(0.741 0.153 38.402);
+	--chart-3: oklch(0.646 0.222 41.116);
+	--chart-4: oklch(0.553 0.195 38.402);
+	--chart-5: oklch(0.447 0.157 38.402);
+}

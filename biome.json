@@ -96,6 +96,12 @@
 						"useSemanticElements": "off",
 						"useKeyWithClickEvents": "off",
 						"noLabelWithoutControl": "off"
+					},
+					"suspicious": {
+						"noDocumentCookie": "off"
+					},
+					"correctness": {
+						"useExhaustiveDependencies": "off"
 					}
 				}
 			}

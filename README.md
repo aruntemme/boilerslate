@@ -22,7 +22,7 @@ Web on <http://localhost:3001>, API on <http://localhost:3000>.
 - **[oRPC](https://orpc.unnoq.com)** — typed RPC, with OpenAPI docs for free
 - **[Drizzle](https://orm.drizzle.team)** + **Postgres** — schema and migrations in TypeScript
 - **[Better Auth](https://better-auth.com)** — email/password auth plus organizations
-- **[shadcn/ui](https://ui.shadcn.com)** + **Tailwind v4** — components and styling
+- **[shadcn/ui](https://ui.shadcn.com)** + **Tailwind v4** — components, sidebar shell, eight themes
 - **[Turborepo](https://turbo.build)** + **[Biome](https://biomejs.dev)** — task running, linting, formatting
 
 Types flow from the database schema through to the React client with no code
@@ -69,19 +69,22 @@ await authClient.organization.inviteMember({ email, role: "member" });
 When you write your own oRPC procedures, scope them to the caller's
 organization yourself — see `AGENTS.md`.
 
-## Theming
+## Design system
 
-Re-skin a project by editing four variables in
-`packages/ui/src/styles/brand.css`:
+Eight themes — emerald, violet, blue, cyan, rose, orange, amber, neutral —
+each with a full light and dark palette. Theme and mode are independent axes
+on `<html>`:
 
-```css
---brand-hue: 255;      /* 25 red · 70 orange · 140 green · 255 blue · 300 purple */
---brand-chroma: 0.18;  /* 0 is neutral grey */
---radius: 0.625rem;
---font-sans: ...;
+```html
+<html class="dark" data-theme="violet">
 ```
 
-Light and dark palettes are derived from those, so components need no changes.
+Users switch themes from the header dropdown or the settings page; the choice
+persists and is applied before first paint, so there is no flash on load.
+Corner radius is adjustable too.
+
+Add a theme by adding a token block in `packages/ui/src/styles/themes.css` and
+an entry in `packages/ui/src/lib/themes.ts`. Nothing else needs to change.
 
 ## Adding to the base
 

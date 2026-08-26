@@ -67,6 +67,12 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@boilerslate/ui/components/card";
+import {
+	type ChartConfig,
+	ChartContainer,
+	ChartTooltip,
+	ChartTooltipContent,
+} from "@boilerslate/ui/components/chart";
 import { Checkbox } from "@boilerslate/ui/components/checkbox";
 import {
 	Collapsible,
@@ -141,6 +147,13 @@ import {
 } from "@boilerslate/ui/components/sheet";
 import { Skeleton } from "@boilerslate/ui/components/skeleton";
 import { Slider } from "@boilerslate/ui/components/slider";
+import {
+	Stat,
+	StatDelta,
+	StatGroup,
+	StatLabel,
+	StatValue,
+} from "@boilerslate/ui/components/stat";
 import { Switch } from "@boilerslate/ui/components/switch";
 import {
 	Table,
@@ -171,6 +184,7 @@ import {
 import { createFileRoute } from "@tanstack/react-router";
 import { Bold, Inbox, Italic, Terminal, Underline } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis } from "recharts";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_auth/playground")({
@@ -324,6 +338,107 @@ const DIFF = [
 	{ type: "context" as const, content: "  return base.gallons;" },
 	{ type: "context" as const, content: "}" },
 ];
+
+const CHART_DATA = [
+	{ month: "Jan", desktop: 186, mobile: 120 },
+	{ month: "Feb", desktop: 305, mobile: 200 },
+	{ month: "Mar", desktop: 237, mobile: 175 },
+	{ month: "Apr", desktop: 173, mobile: 90 },
+	{ month: "May", desktop: 209, mobile: 160 },
+	{ month: "Jun", desktop: 214, mobile: 140 },
+];
+
+const CHART_CONFIG = {
+	desktop: { label: "Desktop", color: "var(--chart-2)" },
+	mobile: { label: "Mobile", color: "var(--chart-4)" },
+} satisfies ChartConfig;
+
+/** Charts and stat primitives. Colours come from the theme's chart ramp. */
+function ChartsSection() {
+	return (
+		<>
+			<Section
+				title="Stats"
+				description="Uppercase micro-label over a large value; grouped with dividers."
+			>
+				<StatGroup className="w-full">
+					<Stat>
+						<StatLabel>Desktop</StatLabel>
+						<StatValue>1,224</StatValue>
+					</Stat>
+					<Stat>
+						<StatLabel>Mobile</StatLabel>
+						<StatValue>860</StatValue>
+					</Stat>
+					<Stat>
+						<StatLabel>Mix delta</StatLabel>
+						<StatValue>
+							+42<span className="text-muted-foreground">%</span>
+						</StatValue>
+					</Stat>
+				</StatGroup>
+				<div className="flex w-full gap-3">
+					<StatDelta direction="up">+8.9% up</StatDelta>
+					<StatDelta direction="down">−0.4% down</StatDelta>
+					<StatDelta direction="flat">0.0% flat</StatDelta>
+				</div>
+			</Section>
+
+			<Section
+				title="Charts"
+				description="Recharts via the shadcn chart wrapper. Hover for tooltips."
+			>
+				<div className="grid w-full min-w-0 gap-4 lg:grid-cols-2">
+					<div className="min-w-0">
+						<ChartContainer config={CHART_CONFIG} className="h-48 w-full">
+							<BarChart data={CHART_DATA}>
+								<CartesianGrid vertical={false} strokeDasharray="3 3" />
+								<XAxis
+									dataKey="month"
+									tickLine={false}
+									axisLine={false}
+									tickMargin={8}
+								/>
+								<ChartTooltip content={<ChartTooltipContent />} />
+								<Bar
+									dataKey="desktop"
+									fill="var(--color-desktop)"
+									radius={[4, 4, 0, 0]}
+								/>
+								<Bar
+									dataKey="mobile"
+									fill="var(--color-mobile)"
+									radius={[4, 4, 0, 0]}
+								/>
+							</BarChart>
+						</ChartContainer>
+					</div>
+					<div className="min-w-0">
+						<ChartContainer config={CHART_CONFIG} className="h-48 w-full">
+							<AreaChart data={CHART_DATA}>
+								<CartesianGrid vertical={false} strokeDasharray="3 3" />
+								<XAxis
+									dataKey="month"
+									tickLine={false}
+									axisLine={false}
+									tickMargin={8}
+								/>
+								<ChartTooltip content={<ChartTooltipContent />} />
+								<Area
+									dataKey="desktop"
+									type="natural"
+									stroke="var(--color-desktop)"
+									fill="var(--color-desktop)"
+									fillOpacity={0.2}
+								/>
+							</AreaChart>
+						</ChartContainer>
+					</div>
+				</div>
+			</Section>
+		</>
+	);
+}
 
 /** Every AI primitive, wired to real state. */
 function AiSection() {
@@ -949,6 +1064,8 @@ function RouteComponent() {
 					</PaginationContent>
 				</Pagination>
 			</Section>
+
+			<ChartsSection />
 
 			<AiSection />
 

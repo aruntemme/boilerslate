@@ -194,3 +194,13 @@
 [data-slot="select-scroll-down-button"] {
 	cursor: pointer;
 }
+
+/*
+ * Card rhythm. The generated card ships --card-spacing: 1rem, which reads
+ * cramped once cards carry charts and stat rows. Unlayered for the same reason
+ * as the cursor rules above: the value arrives as a utility class on the
+ * element, and utilities beat @layer base.
+ */
+[data-slot="card"] {
+	--card-spacing: 1.25rem;
+}

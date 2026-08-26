@@ -69,6 +69,14 @@ await authClient.organization.inviteMember({ email, role: "member" });
 When you write your own oRPC procedures, scope them to the caller's
 organization yourself — see `AGENTS.md`.
 
+## Dashboard & charts
+
+`/dashboard` is the reference for data-dense pages: KPI cards with sparklines,
+a bar chart with a divided stat footer, a donut with a centred total, an area
+chart and usage meters. Charts are [Recharts](https://recharts.org) via the
+shadcn `ChartContainer`, coloured from the theme's chart ramp — switch theme
+and every chart follows.
+
 ## AI components
 
 Ten primitives for agent interfaces live in

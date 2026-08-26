@@ -95,6 +95,11 @@ by the caller's organization — Better Auth's endpoints do this for you, but
 your own oRPC procedures do not. Scope them yourself, and add a test proving a
 non-member gets a 403. `apps/server/src/index.test.ts` has the pattern.
 
+**Density.** `--card-spacing` is overridden to `1.25rem` in `globals.css`; the
+generated default of `1rem` reads cramped once cards carry charts and stat
+rows. Use `StatLabel` / `StatValue` / `StatGroup` (`components/stat.tsx`) for
+the uppercase-label-over-large-number pattern rather than re-inventing it.
+
 **Theming.** Two independent axes, both set on `<html>`:
 `data-theme="<id>"` picks the colour family, `.dark` picks the mode. Eight
 themes ship: emerald (default), violet, blue, cyan, rose, orange, amber,
@@ -166,6 +171,16 @@ drop what you do not use.
 
 They take data as props and emit callbacks; none of them talk to a model. Wire
 them to your own streaming endpoint.
+
+**Charts.** Recharts, through the shadcn `ChartContainer` wrapper. Colours come
+from the theme's `--chart-1..5` ramp, so charts re-skin with the theme — never
+hard-code a hex in a chart.
+
+Any chart inside a grid or flex parent needs **`min-w-0` on that parent**. Grid
+and flex items default to `min-width: auto`, so the chart's measured width can
+widen its own track, which widens the chart again — a feedback loop that blows
+the layout out and squashes the plot. It renders, so the build stays green; you
+only see it in a browser.
 
 **Adding a UI component.** After `shadcn add`, render it on `/playground`
 (`apps/web/src/routes/_auth/playground.tsx`). That page exists so theme and

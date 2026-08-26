@@ -30,6 +30,7 @@ import {
 	ChevronsUpDown,
 	LayoutDashboard,
 	LogOut,
+	Palette,
 	Settings,
 	Squircle,
 } from "lucide-react";
@@ -37,6 +38,7 @@ import { authClient } from "@/lib/auth-client";
 
 const NAV_ITEMS = [
 	{ to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+	{ to: "/playground", label: "Playground", icon: Palette },
 	{ to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 

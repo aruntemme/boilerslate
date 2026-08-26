@@ -1,0 +1,73 @@
+{
+	"name": "boilerslate",
+	"private": true,
+	"type": "module",
+	"workspaces": {
+		"packages": [
+			"apps/*",
+			"packages/*"
+		],
+		"catalog": {
+			"dotenv": "^17.4.2",
+			"zod": "^4.4.3",
+			"typescript": "^6.0.3",
+			"@types/bun": "^1.3.14",
+			"hono": "^4.12.32",
+			"@orpc/server": "^1.14.12",
+			"@orpc/openapi": "^1.14.12",
+			"@orpc/zod": "^1.14.12",
+			"better-auth": "1.7.1",
+			"lucide-react": "^1.27.0",
+			"next-themes": "^0.4.6",
+			"react": "^19.2.8",
+			"react-dom": "^19.2.8",
+			"sonner": "^2.0.7",
+			"tailwindcss": "^4.3.3",
+			"@orpc/client": "^1.14.12",
+			"@types/react": "^19.2.17",
+			"@types/react-dom": "^19.2.3"
+		}
+	},
+	"scripts": {
+		"dev": "turbo run dev",
+		"build": "turbo run build",
+		"check-types": "turbo run check-types",
+		"dev:web": "turbo run dev -F web --",
+		"dev:server": "turbo run dev -F server --",
+		"db:push": "turbo run db:push -F @boilerslate/db --",
+		"db:studio": "turbo run db:studio -F @boilerslate/db --",
+		"db:generate": "turbo run db:generate -F @boilerslate/db --",
+		"db:migrate": "turbo run db:migrate -F @boilerslate/db --",
+		"db:start": "docker compose up -d postgres",
+		"db:watch": "docker compose up postgres",
+		"db:stop": "docker compose stop postgres",
+		"db:down": "docker compose down postgres",
+		"docker:build": "docker compose build",
+		"docker:up": "docker compose up -d --build",
+		"docker:down": "docker compose down",
+		"docker:logs": "docker compose logs -f",
+		"check": "biome check --write .",
+		"test": "turbo run test",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"db:reset": "docker compose down -v postgres && bun run db:start && bun run db:wait && bun run db:migrate",
+		"db:wait": "until docker exec boilerslate-postgres pg_isready -U postgres >/dev/null 2>&1; do sleep 1; done",
+		"verify": "bun run lint && bun run check-types && bun run build && bun run test",
+		"gen:package": "bun run scripts/gen-package.ts",
+		"setup": "bun run scripts/setup.ts"
+	},
+	"packageManager": "bun@1.2.15",
+	"dependencies": {
+		"dotenv": "catalog:",
+		"zod": "catalog:",
+		"@boilerslate/env": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/bun": "catalog:",
+		"@boilerslate/config": "workspace:*",
+		"turbo": "^2.10.7",
+		"@biomejs/biome": "^2.5.6",
+		"lefthook": "^2.1.10"
+	}
+}

@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: boilerslate
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:password@localhost:5433/boilerslate
+      BETTER_AUTH_SECRET: ci-secret-not-used-in-production
+      BETTER_AUTH_URL: http://localhost:3000
+      CORS_ORIGIN: http://localhost:3001
+      VITE_SERVER_URL: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      # The app reads these from per-app .env files, which are gitignored.
+      - name: Write env files
+        run: |
+          cat > apps/server/.env <<EOF
+          DATABASE_URL=$DATABASE_URL
+          BETTER_AUTH_SECRET=$BETTER_AUTH_SECRET
+          BETTER_AUTH_URL=$BETTER_AUTH_URL
+          CORS_ORIGIN=$CORS_ORIGIN
+          EOF
+          echo "VITE_SERVER_URL=$VITE_SERVER_URL" > apps/web/.env
+
+      - run: bun run db:migrate
+
+      # lint + typecheck + build + integration tests against real Postgres
+      - run: bun run verify

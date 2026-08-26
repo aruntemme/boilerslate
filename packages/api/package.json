@@ -1,0 +1,29 @@
+{
+	"name": "@boilerslate/api",
+	"exports": {
+		".": {
+			"default": "./src/index.ts"
+		},
+		"./*": {
+			"default": "./src/*.ts"
+		}
+	},
+	"type": "module",
+	"scripts": {},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@boilerslate/config": "workspace:*",
+		"hono": "catalog:"
+	},
+	"dependencies": {
+		"dotenv": "catalog:",
+		"zod": "catalog:",
+		"@boilerslate/env": "workspace:*",
+		"@boilerslate/auth": "workspace:*",
+		"@boilerslate/db": "workspace:*",
+		"@orpc/server": "catalog:",
+		"@orpc/client": "catalog:",
+		"@orpc/openapi": "catalog:",
+		"@orpc/zod": "catalog:"
+	}
+}

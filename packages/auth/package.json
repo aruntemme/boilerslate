@@ -1,0 +1,24 @@
+{
+	"name": "@boilerslate/auth",
+	"exports": {
+		".": {
+			"default": "./src/index.ts"
+		},
+		"./*": {
+			"default": "./src/*.ts"
+		}
+	},
+	"type": "module",
+	"scripts": {},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@boilerslate/config": "workspace:*"
+	},
+	"dependencies": {
+		"dotenv": "catalog:",
+		"zod": "catalog:",
+		"@boilerslate/env": "workspace:*",
+		"@boilerslate/db": "workspace:*",
+		"better-auth": "catalog:"
+	}
+}

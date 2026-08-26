@@ -1,0 +1,3 @@
+{
+	"extends": "@boilerslate/config/tsconfig.base.json"
+}

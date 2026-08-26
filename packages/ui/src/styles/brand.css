@@ -1,0 +1,49 @@
+/*
+ * BRAND LAYER — the only file you edit to re-skin a project.
+ *
+ * globals.css holds the full shadcn token set (a neutral greyscale default).
+ * This file is imported last, so anything set here wins. Per project, change
+ * the four knobs below and the whole UI follows; touch nothing else.
+ *
+ * Colours are oklch(lightness chroma hue):
+ *   lightness 0..1  ·  chroma 0 (grey) .. ~0.3 (vivid)  ·  hue 0..360 degrees
+ * Hue reference: 25 red · 70 orange · 140 green · 255 blue · 300 purple.
+ */
+
+:root {
+	/* 1. Brand hue, in degrees. */
+	--brand-hue: 255;
+	/* 2. Brand saturation. 0 gives the neutral greyscale default. */
+	--brand-chroma: 0.18;
+	/* 3. Corner radius for every component. */
+	--radius: 0.625rem;
+	/* 4. Font stack. */
+	--font-sans:
+		ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+		"Helvetica Neue", Arial, sans-serif;
+}
+
+/* Light theme: derive the accent tokens from the knobs above.
+   `:root:root` doubles specificity so these win over globals.css. */
+:root:root {
+	--primary: oklch(0.55 var(--brand-chroma) var(--brand-hue));
+	--primary-foreground: oklch(0.985 0 0);
+	--accent: oklch(0.96 calc(var(--brand-chroma) * 0.15) var(--brand-hue));
+	--accent-foreground: oklch(0.35 var(--brand-chroma) var(--brand-hue));
+	--ring: oklch(0.55 var(--brand-chroma) var(--brand-hue));
+	--sidebar-primary: oklch(0.55 var(--brand-chroma) var(--brand-hue));
+	--sidebar-primary-foreground: oklch(0.985 0 0);
+	--sidebar-ring: oklch(0.55 var(--brand-chroma) var(--brand-hue));
+}
+
+/* Dark theme: same hue, lifted lightness so it stays legible on dark ground. */
+.dark.dark {
+	--primary: oklch(0.72 var(--brand-chroma) var(--brand-hue));
+	--primary-foreground: oklch(0.18 0 0);
+	--accent: oklch(0.32 calc(var(--brand-chroma) * 0.4) var(--brand-hue));
+	--accent-foreground: oklch(0.96 0 0);
+	--ring: oklch(0.72 var(--brand-chroma) var(--brand-hue));
+	--sidebar-primary: oklch(0.72 var(--brand-chroma) var(--brand-hue));
+	--sidebar-primary-foreground: oklch(0.18 0 0);
+	--sidebar-ring: oklch(0.72 var(--brand-chroma) var(--brand-hue));
+}
